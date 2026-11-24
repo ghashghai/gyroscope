@@ -408,7 +408,6 @@ function validate(d, cols, names, opt) {
 
 </script>
 <script>
-var COINALYZE_KEY = '322170a1-8172-4349-83cd-7fca61183feb';
 var COINS = ['BTC', 'ETH', 'BNB', 'SUI'];
 const $ = (id) => document.getElementById(id);
 const log = (m, c) => { const d = document.createElement('div'); d.textContent = m; if (c) d.className = c; $('log').appendChild(d); };
@@ -457,11 +456,10 @@ async function fetchPrice() {
 }
 
 async function fetchLiq() {
-  const now = Math.floor(Date.now() / 1000);
-  const syms = COINS.map((c) => c + 'USDT_PERP.A').join(',');
-  const url = 'https://api.coinalyze.net/v1/liquidation-history?symbols=' + syms + '&interval=daily&from=1546300800&to=' + now + '&convert_to_usd=true&api_key=' + COINALYZE_KEY;
-  const j = await getJSON(url);
-  if (!Array.isArray(j)) throw new Error('پاسخ Coinalyze ناشناخته: ' + JSON.stringify(j).slice(0, 80));
+  const j0 = await getJSON('./liq.json?ts=' + Date.now());
+  const j = j0 && j0.data;
+  if (!Array.isArray(j)) throw new Error('فایل داده هنوز ساخته نشده؛ چند دقیقه بعد دوباره بزن');
+  window.__fetchedAt = j0.fetched;
   const out = {};
   for (const s of j) {
     const base = String(s.symbol || '').split(/USDT|USD/)[0];
@@ -515,7 +513,7 @@ async function run() {
   try {
     log('در حال گرفتن لیکویید…');
     const liq = await fetchLiq();
-    log('لیکویید آمد: ' + Object.keys(liq).join('، '));
+    log('لیکویید آمد: ' + Object.keys(liq).join('، ') + ' (به‌روز شده: ' + new Date(window.__fetchedAt * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC)');
     let html = '', signNote = 'فرض کرده‌ام ستون l همان لانگ است.', d = null;
     try {
       log('در حال گرفتن قیمت بیت‌کوین…');
@@ -543,7 +541,7 @@ async function run() {
     log('تمام شد.');
   } catch (e) {
     log('خطا: ' + e.message, 'dn');
-    if (/Failed to fetch|NetworkError|Load failed/i.test(e.message)) log('مرورگر اجازهٔ خواندن مستقیم از Coinalyze را نداد (CORS). به من بگو تا راه دیگری بگذارم.', 'dn');
+    if (/Failed to fetch|NetworkError|Load failed/i.test(e.message)) log('', 'dn');
   }
   $('go').disabled = false;
 }
