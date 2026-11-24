@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>رادار لیکویید ژیروسکوپ</title>
+<style>
+:root{--bg:#0d1020;--card:#151a2e;--line:#2a3150;--tx:#ebe8df;--mut:#9ca3bb;--gold:#d9b45b;--up:#43b985;--dn:#e8645d;--ink:#17130a;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:Vazirmatn,Tahoma,system-ui,sans-serif;font-size:15px;line-height:1.9;padding:12px 16px}
+.wrap{max-width:560px;margin:0 auto}
+h1{font-size:21px;color:var(--gold);margin:8px 0 2px}
+h2{font-size:16px;color:var(--gold);margin:0 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+.mut{color:var(--mut);font-size:13px}
+button{background:var(--gold);color:var(--ink);border:0;border-radius:10px;padding:10px 16px;font-size:15px;font-weight:600;font-family:inherit}
+button:disabled{opacity:.5}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:5px 4px;border-bottom:1px solid var(--line);text-align:center}
+th{color:var(--mut);font-weight:400}
+td:first-child,th:first-child{text-align:right}
+.tw{overflow-x:auto}
+.up{color:var(--up)}.dn{color:var(--dn)}
+.warn{border-color:#6b5a2a}
+#log div{font-size:13px;color:var(--mut)}
+.bar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:6px 0}
+.bar i{display:block;height:100%}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>رادار لیکویید ژیروسکوپ</h1>
+<div class="mut">در ۱۵ و ۳۰ روز اخیر، لیکوییدِ بیشتر از طرف لانگ‌ها بود (فشار از ریزش) یا شورت‌ها (فشار از جهش). داده: Coinalyze (فقط بایننس). این پیش‌بینی نیست.</div>
+<div style="margin:10px 0"><button id="go">به‌روزرسانی</button></div>
+<div id="log"></div>
+<div id="out"></div>
+</div>
+<script>
+// ---------- Analog engine (pure functions; runs in browser and node) ----------
+function sma(a, n) {
+  const o = new Float64Array(a.length).fill(NaN);
+  let s = 0;
+  for (let i = 0; i < a.length; i++) {
+    s += a[i];
+    if (i >= n) s -= a[i - n];
+    if (i >= n - 1) o[i] = s / n;
+  }
+  return o;
+}
+function ema(a, n) {
+  const o = new Float64Array(a.length).fill(NaN);
+  const k = 2 / (n + 1);
+  let p = NaN;
+  for (let i = 0; i < a.length; i++) {
+    if (isNaN(p)) {
+      if (i >= n - 1) {
+        let s = 0;
+        for (let j = i - n + 1; j <= i; j++) s += a[j];
+        p = s / n;
+        o[i] = p;
+      }
+    } else {
+      p = a[i] * k + p * (1 - k);
+      o[i] = p;
+    }
+  }
+  return o;
+}
+function rollMax(a, n) {
+  const o = new Float64Array(a.length).fill(NaN);
+  for (let i = n - 1; i < a.length; i++) {
+    let m = -Infinity;
+    for (let j = i - n + 1; j <= i; j++) if (a[j] > m) m = a[j];
+    o[i] = m;
+  }
+  return o;
+}
+function rollMin(a, n) {
+  const o = new Float64Array(a.length).fill(NaN);
+  for (let i = n - 1; i < a.length; i++) {
+    let m = Infinity;
+    for (let j = i - n + 1; j <= i; j++) if (a[j] < m) m = a[j];
+    o[i] = m;
+  }
+  return o;
+}
+
+// d = {t:[unix sec], h:[], l:[], c:[], v:[]}  (consecutive daily candles)
+// ext = {fng: Map(dayIdx->0..100), usdt: Map(dayIdx->supply), extra: Map(dayIdx->value)}
+function buildFeatures(d, ext) {
+  ext = ext || {};
+  const n = d.c.length, c = d.c, h = d.h, l = d.l, v = d.v;
+  const s21 = sma(c, 21), s150 = sma(c, 150);
+  const e12 = ema(c, 12), e26 = ema(c, 26);
+  const macd = new Float64Array(n).fill(NaN);
+  for (let i = 0; i < n; i++) if (!isNaN(e12[i]) && !isNaN(e26[i])) macd[i] = e12[i] - e26[i];
+  const sub = macd.slice(25);
+  const sig = ema(sub, 9);
+  const signal = new Float64Array(n).fill(NaN);
+  for (let i = 0; i < sub.length; i++) signal[i + 25] = sig[i];
+  const tr = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const pc = i > 0 ? c[i - 1] : c[i];
+    tr[i] = Math.max(h[i] - l[i], Math.abs(h[i] - pc), Math.abs(l[i] - pc));
+  }
+  const atr = sma(tr, 14);
+  const hh14 = rollMax(h, 14), ll14 = rollMin(l, 14);
+  const hh365 = rollMax(c, 365);
+  const v7 = sma(v, 7), v90 = sma(v, 90);
+
+  const cols = {};
+  const mk = () => new Float64Array(n).fill(NaN);
+  for (const nm of ['sma150', 'sma21', 'macd', 'r14', 'atr', 'vol', 'dd', 'mom30']) cols[nm] = mk();
+  for (let i = 364; i < n; i++) {
+    cols.sma150[i] = Math.log(c[i] / s150[i]);
+    cols.sma21[i] = Math.log(c[i] / s21[i]);
+    cols.macd[i] = (macd[i] - signal[i]) / c[i];
+    const rng = hh14[i] - ll14[i];
+    cols.r14[i] = rng > 0 ? (hh14[i] - c[i]) / rng : NaN;
+    cols.atr[i] = atr[i] / c[i];
+    cols.vol[i] = v7[i] > 0 && v90[i] > 0 ? Math.log(v7[i] / v90[i]) : NaN;
+    cols.dd[i] = c[i] / hh365[i] - 1;
+    cols.mom30[i] = Math.log(c[i] / c[i - 30]);
+  }
+  const names = ['sma150', 'sma21', 'macd', 'r14', 'atr', 'vol', 'dd', 'mom30'];
+  const day = (i) => Math.floor(d.t[i] / 86400);
+  if (ext.fng && ext.fng.size) {
+    cols.fng = mk();
+    for (let i = 0; i < n; i++) { const x = ext.fng.get(day(i)); if (x !== undefined) cols.fng[i] = x / 100; }
+    names.push('fng');
+  }
+  if (ext.usdt && ext.usdt.size) {
+    cols.usdt30 = mk();
+    for (let i = 30; i < n; i++) {
+      const a = ext.usdt.get(day(i)), b = ext.usdt.get(day(i - 30));
+      if (a > 0 && b > 0) cols.usdt30[i] = Math.log(a / b);
+    }
+    names.push('usdt30');
+  }
+  if (ext.extra && ext.extra.size) {
+    cols.extra = mk();
+    for (let i = 0; i < n; i++) { const x = ext.extra.get(day(i)); if (x !== undefined && isFinite(x)) cols.extra[i] = x; }
+    names.push('extra');
+  }
+  let aux = null;
+  if (ext.liq && ext.liq.size) {
+    const L = new Float64Array(n).fill(NaN), S = new Float64Array(n).fill(NaN);
+    for (let i = 0; i < n; i++) { const x = ext.liq.get(day(i)); if (x) { L[i] = x.l; S[i] = x.s; } }
+    const f = liqFeatureCols(L, S);
+    cols.liqImb15 = f.imb15; cols.liqImb30 = f.imb30; cols.liqMag = f.mag;
+    names.push('liqImb15', 'liqImb30', 'liqMag');
+    aux = { L, S };
+  }
+  return { cols, names, aux };
+}
+
+// ---------- Liquidation helpers ----------
+function rollSumStrict(a, w) {
+  const o = new Float64Array(a.length).fill(NaN);
+  for (let i = w - 1; i < a.length; i++) {
+    let s = 0, ok = true;
+    for (let j = i - w + 1; j <= i; j++) { if (!isFinite(a[j])) { ok = false; break; } s += a[j]; }
+    if (ok) o[i] = s;
+  }
+  return o;
+}
+// L,S: daily long / short liquidated USD (NaN = missing)
+function liqFeatureCols(L, S) {
+  const n = L.length;
+  const L15 = rollSumStrict(L, 15), S15 = rollSumStrict(S, 15), L30 = rollSumStrict(L, 30), S30 = rollSumStrict(S, 30);
+  const T = new Float64Array(n);
+  for (let i = 0; i < n; i++) T[i] = L[i] + S[i];
+  const T15 = rollSumStrict(T, 15), T90 = rollSumStrict(T, 90);
+  const imb15 = new Float64Array(n).fill(NaN), imb30 = new Float64Array(n).fill(NaN), mag = new Float64Array(n).fill(NaN);
+  for (let i = 0; i < n; i++) {
+    if (L15[i] + S15[i] > 0) imb15[i] = (L15[i] - S15[i]) / (L15[i] + S15[i]);
+    if (L30[i] + S30[i] > 0) imb30[i] = (L30[i] - S30[i]) / (L30[i] + S30[i]);
+    if (T15[i] > 0 && T90[i] > 0) mag[i] = Math.log(T15[i] / (T90[i] / 6));
+  }
+  return { imb15, imb30, mag, L15, S15, L30, S30 };
+}
+// map: day -> {l,s}. Describes the latest complete day.
+function coinLiqRadar(map, todayDay) {
+  const days = Array.from(map.keys()).filter((k) => k < todayDay).sort((a, b) => a - b);
+  if (days.length < 120) return { error: 'تاریخچهٔ لیکویید کم است: ' + days.length + ' روز' };
+  const d0 = days[0], d1 = days[days.length - 1], n = d1 - d0 + 1;
+  const L = new Float64Array(n).fill(NaN), S = new Float64Array(n).fill(NaN);
+  for (const k of days) { const x = map.get(k); L[k - d0] = x.l; S[k - d0] = x.s; }
+  const f = liqFeatureCols(L, S);
+  const last = n - 1;
+  if (!isFinite(f.imb15[last])) return { error: 'روزهای آخر ناقص است' };
+  const pct = (arr, x) => {
+    const v = Array.from(arr).filter((y) => isFinite(y));
+    return v.length ? v.filter((y) => y <= x).length / v.length : NaN;
+  };
+  return {
+    asof: d1 * 86400, firstDay: d0 * 86400, nDays: days.length,
+    d15: { L: f.L15[last], S: f.S15[last], share: f.L15[last] / (f.L15[last] + f.S15[last]) },
+    d30: { L: f.L30[last], S: f.S30[last], share: isFinite(f.L30[last]) ? f.L30[last] / (f.L30[last] + f.S30[last]) : NaN },
+    imb15: f.imb15[last], pctImb15: pct(f.imb15, f.imb15[last]),
+    mag: f.mag[last], pctMag: pct(f.mag, f.mag[last]),
+  };
+}
+// Does a raw liquidation feature relate to the price move that follows? (no fitting, so no look-ahead)
+function liqStudy(d, cols, key) {
+  const n = d.c.length, all = [];
+  for (let i = 0; i < n; i++) if (isFinite(cols[key][i])) all.push(i);
+  if (all.length < 400) return { error: 'داده کافی نیست' };
+  const vals = all.map((i) => cols[key][i]);
+  const q20 = quantile(vals, 0.2), q80 = quantile(vals, 0.8);
+  const xs = [], ys = [];
+  let last = -999;
+  for (const i of all) {
+    if (i - last < 30) continue;
+    const y = fwdRet(d.c, i, 30);
+    if (!isFinite(y)) continue;
+    xs.push(cols[key][i]); ys.push(y); last = i;
+  }
+  const sp = pearson(rank(xs), rank(ys));
+  const t = sp * Math.sqrt((xs.length - 2) / (1 - sp * sp));
+  const bucket = (x) => (x <= q20 ? 'low' : x >= q80 ? 'high' : 'mid');
+  const groups = { low: [], mid: [], high: [] };
+  for (const i of all) groups[bucket(cols[key][i])].push(i);
+  const out = {};
+  for (const g of ['low', 'mid', 'high']) {
+    out[g] = { days: groups[g].length };
+    for (const h of HORIZONS) out[g]['h' + h] = summarize(groups[g].map((i) => fwdRet(d.c, i, h)));
+  }
+  const x = cols[key][n - 1];
+  return { n: xs.length, spearman: sp, t, q20, q80, buckets: out, todayBucket: isFinite(x) ? bucket(x) : null, todayX: x };
+}
+// Sign check: long liquidations should dominate on down days.
+function liqSignCheck(d, aux) {
+  const r = [], s = [];
+  for (let i = 1; i < d.c.length; i++) {
+    const a = aux.L[i], b = aux.S[i];
+    if (isFinite(a) && isFinite(b) && a + b > 0) { r.push(Math.log(d.c[i] / d.c[i - 1])); s.push((a - b) / (a + b)); }
+  }
+  return { n: r.length, corr: pearson(r, s) };
+}
+
+function median(a) { return quantile(a, 0.5); }
+function quantile(a, p) {
+  const b = Array.from(a).filter((x) => isFinite(x)).sort((x, y) => x - y);
+  if (!b.length) return NaN;
+  const k = (b.length - 1) * p, f = Math.floor(k), c = Math.ceil(k);
+  return b[f] + (b[c] - b[f]) * (k - f);
+}
+function validRows(cols, names, lo, hi) {
+  const out = [];
+  for (let i = lo; i <= hi; i++) {
+    let ok = true;
+    for (const nm of names) if (!isFinite(cols[nm][i])) { ok = false; break; }
+    if (ok) out.push(i);
+  }
+  return out;
+}
+function scaleFit(cols, names, pool) {
+  return names.map((nm) => {
+    const vals = pool.map((i) => cols[nm][i]);
+    const m = median(vals);
+    const mad = median(vals.map((x) => Math.abs(x - m))) * 1.4826;
+    let s = mad;
+    if (!(s > 1e-12)) {
+      const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+      s = Math.sqrt(vals.reduce((a, b) => a + (b - mean) * (b - mean), 0) / vals.length);
+    }
+    if (!(s > 1e-12)) s = 1;
+    return { m, s };
+  });
+}
+function zf(x, sc) {
+  const z = (x - sc.m) / sc.s;
+  return z > 4 ? 4 : z < -4 ? -4 : z;
+}
+function neighbors(cols, names, pool, qi, sc, K, gap) {
+  const q = names.map((nm, j) => zf(cols[nm][qi], sc[j]));
+  const arr = [];
+  for (const i of pool) {
+    let s = 0;
+    for (let j = 0; j < names.length; j++) {
+      const dd = zf(cols[names[j]][i], sc[j]) - q[j];
+      s += dd * dd;
+    }
+    arr.push([Math.sqrt(s), i]);
+  }
+  arr.sort((a, b) => a[0] - b[0]);
+  const out = [];
+  for (const [dist, i] of arr) {
+    let far = true;
+    for (const o of out) if (Math.abs(o.i - i) <= gap) { far = false; break; }
+    if (far) { out.push({ i, dist }); if (out.length >= K) break; }
+  }
+  return out;
+}
+function fwdRet(c, i, h) { return i + h < c.length ? Math.log(c[i + h] / c[i]) : NaN; }
+function fwdMDD(d, i, h) {
+  if (i + h >= d.c.length) return NaN;
+  let m = 0;
+  for (let k = 1; k <= h; k++) m = Math.min(m, d.l[i + k] / d.c[i] - 1);
+  return m;
+}
+function summarize(arr) {
+  const a = Array.from(arr).filter((x) => isFinite(x));
+  return {
+    n: a.length,
+    med: median(a),
+    q25: quantile(a, 0.25),
+    q75: quantile(a, 0.75),
+    up: a.length ? a.filter((x) => x > 0).length / a.length : NaN,
+  };
+}
+function rank(a) {
+  const idx = a.map((x, i) => [x, i]).sort((p, q) => p[0] - q[0]);
+  const r = new Array(a.length);
+  let i = 0;
+  while (i < idx.length) {
+    let j = i;
+    while (j + 1 < idx.length && idx[j + 1][0] === idx[i][0]) j++;
+    const rk = (i + j) / 2 + 1;
+    for (let k = i; k <= j; k++) r[idx[k][1]] = rk;
+    i = j + 1;
+  }
+  return r;
+}
+function pearson(a, b) {
+  const n = a.length;
+  if (n < 3) return NaN;
+  const ma = a.reduce((x, y) => x + y, 0) / n, mb = b.reduce((x, y) => x + y, 0) / n;
+  let sab = 0, saa = 0, sbb = 0;
+  for (let i = 0; i < n; i++) { sab += (a[i] - ma) * (b[i] - mb); saa += (a[i] - ma) ** 2; sbb += (b[i] - mb) ** 2; }
+  return sab / Math.sqrt(saa * sbb);
+}
+
+const HORIZONS = [7, 30, 90];
+
+function runLive(d, cols, names, opt) {
+  opt = Object.assign({ K: 15, gap: 14 }, opt || {});
+  const n = d.c.length, qi = n - 1;
+  for (const nm of names) if (!isFinite(cols[nm][qi])) return { error: 'ویژگی «' + nm + '» برای امروز مقدار ندارد' };
+  const pool = validRows(cols, names, 0, n - 1 - 90);
+  if (pool.length < 200) return { error: 'تعداد روزهای قابل مقایسه کم است: ' + pool.length };
+  const sc = scaleFit(cols, names, pool);
+  const nb = neighbors(cols, names, pool, qi, sc, opt.K, opt.gap);
+  const res = { qi, poolSize: pool.length, neighbors: nb, horizons: {}, today: {} };
+  for (const h of HORIZONS) {
+    res.horizons[h] = {
+      analog: summarize(nb.map((o) => fwdRet(d.c, o.i, h))),
+      base: summarize(pool.map((i) => fwdRet(d.c, i, h))),
+    };
+  }
+  res.mdd30 = {
+    analog: median(nb.map((o) => fwdMDD(d, o.i, 30))),
+    base: median(pool.map((i) => fwdMDD(d, i, 30))),
+  };
+  names.forEach((nm, j) => {
+    const vals = pool.map((i) => cols[nm][i]);
+    const x = cols[nm][qi];
+    res.today[nm] = { value: x, pct: vals.filter((y) => y <= x).length / vals.length };
+  });
+  return res;
+}
+
+// Walk-forward: only data available at test day t (matches with outcomes fully known) is used.
+function validate(d, cols, names, opt) {
+  opt = Object.assign({ K: 15, gap: 14, step: 30, h: 30, startDay: 16436 /* 2015-01-01 */ }, opt || {});
+  const n = d.c.length, preds = [], reals = [], trend = [], rows = [];
+  for (let t = 0; t + opt.h < n; t++) {
+    if (Math.floor(d.t[t] / 86400) < opt.startDay) continue;
+    if (rows.length && t - rows[rows.length - 1] < opt.step) continue;
+    let ok = true;
+    for (const nm of names) if (!isFinite(cols[nm][t])) { ok = false; break; }
+    if (!ok) continue;
+    const pool = validRows(cols, names, 0, t - 90);
+    if (pool.length < 300) continue;
+    const sc = scaleFit(cols, names, pool);
+    const nb = neighbors(cols, names, pool, t, sc, opt.K, opt.gap);
+    const pred = median(nb.map((o) => fwdRet(d.c, o.i, opt.h)));
+    preds.push(pred);
+    reals.push(fwdRet(d.c, t, opt.h));
+    trend.push(cols.sma150[t]);
+    rows.push(t);
+  }
+  const m = preds.length;
+  if (m < 10) return { error: 'نمونهٔ اعتبارسنجی کافی نیست: ' + m };
+  const pc = pearson(preds, reals);
+  const sp = pearson(rank(preds), rank(reals));
+  const tstat = sp * Math.sqrt((m - 2) / (1 - sp * sp));
+  let hit = 0, cnt = 0;
+  for (let i = 0; i < m; i++) if (reals[i] !== 0 && preds[i] !== 0) { cnt++; if (Math.sign(preds[i]) === Math.sign(reals[i])) hit++; }
+  const cum = (f) => Math.exp(reals.reduce((a, r, i) => a + f(i, r), 0));
+  return {
+    n: m,
+    pearson: pc,
+    spearman: sp,
+    t: tstat,
+    hitRate: hit / cnt,
+    equity: {
+      analog: cum((i, r) => (preds[i] > 0 ? r : 0)),
+      trend: cum((i, r) => (trend[i] > 0 ? r : 0)),
+      hold: cum((i, r) => r),
+    },
+    firstDay: d.t[rows[0]],
+    lastDay: d.t[rows[m - 1]],
+    longShare: preds.filter((p) => p > 0).length / m,
+  };
+}
+
+</script>
+<script>
+var COINALYZE_KEY = '322170a1-8172-4349-83cd-7fca61183feb';
+var COINS = ['BTC', 'ETH', 'BNB', 'SUI'];
+const $ = (id) => document.getElementById(id);
+const log = (m, c) => { const d = document.createElement('div'); d.textContent = m; if (c) d.className = c; $('log').appendChild(d); };
+const dstr = (sec) => new Date(sec * 1000).toISOString().slice(0, 10);
+const pc = (x) => (isFinite(x) ? ((Math.exp(x) - 1) * 100).toFixed(1) + '٪' : '—');
+const cls = (x) => (x > 0 ? 'up' : x < 0 ? 'dn' : '');
+const usd = (x) => !isFinite(x) ? '—' : x >= 1e9 ? (x / 1e9).toFixed(2) + ' میلیارد$' : (x / 1e6).toFixed(0) + ' میلیون$';
+
+async function getJSON(url) {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), 25000);
+  try {
+    const r = await fetch(url, { signal: ac.signal });
+    if (r.status === 429) throw new Error('تعداد درخواست زیاد است؛ یک دقیقه بعد دوباره بزن');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+
+async function fetchPrice() {
+  // spot first (longer history); perp as fallback
+  const hosts = [
+    ['https://api.binance.com/api/v3/klines', 'spot'],
+    ['https://fapi.binance.com/fapi/v1/klines', 'perp'],
+  ];
+  let lastErr = null;
+  for (const [base, kind] of hosts) {
+    try {
+      const rows = [];
+      let start = Date.UTC(2019, 0, 1);
+      for (let k = 0; k < 8; k++) {
+        const a = await getJSON(base + '?symbol=BTCUSDT&interval=1d&limit=1000&startTime=' + start);
+        if (!a.length) break;
+        for (const x of a) rows.push(x);
+        start = a[a.length - 1][0] + 86400000;
+        if (a.length < 1000) break;
+      }
+      if (rows.length < 500) throw new Error('تاریخچه قیمت کوتاه است');
+      const todayMs = Math.floor(Date.now() / 86400000) * 86400000;
+      const seen = new Set(), out = [];
+      for (const x of rows) { const tms = +x[0]; if (tms >= todayMs || seen.has(tms)) continue; seen.add(tms); out.push(x); }
+      return { kind, d: { t: out.map((x) => Math.floor(+x[0] / 1000)), c: out.map((x) => +x[4]), h: out.map((x) => +x[2]), l: out.map((x) => +x[3]), v: out.map((x) => +x[7]) } };
+    } catch (e) { lastErr = e; }
+  }
+  throw new Error('قیمت بیت‌کوین از بایننس نیامد: ' + (lastErr && lastErr.message));
+}
+
+async function fetchLiq() {
+  const now = Math.floor(Date.now() / 1000);
+  const syms = COINS.map((c) => c + 'USDT_PERP.A').join(',');
+  const url = 'https://api.coinalyze.net/v1/liquidation-history?symbols=' + syms + '&interval=daily&from=1546300800&to=' + now + '&convert_to_usd=true&api_key=' + COINALYZE_KEY;
+  const j = await getJSON(url);
+  if (!Array.isArray(j)) throw new Error('پاسخ Coinalyze ناشناخته: ' + JSON.stringify(j).slice(0, 80));
+  const out = {};
+  for (const s of j) {
+    const base = String(s.symbol || '').split(/USDT|USD/)[0];
+    if (!COINS.includes(base)) continue;
+    const m = out[base] || (out[base] = new Map());
+    for (const x of (s.history || [])) {
+      const day = Math.floor(+x.t / 86400);
+      const o = m.get(day) || { l: 0, s: 0 };
+      o.l += +x.l || 0; o.s += +x.s || 0; m.set(day, o);
+    }
+  }
+  if (!Object.keys(out).length) throw new Error('برای هیچ ارزی داده نیامد');
+  return out;
+}
+function swapMap(m) { const o = new Map(); for (const [k, v] of m) o.set(k, { l: v.s, s: v.l }); return o; }
+
+function sideText(share) {
+  if (!isFinite(share)) return '—';
+  if (share >= 0.6) return 'بیشترِ لیکوییدها از طرف لانگ‌ها بود: فشار از ریزش آمد';
+  if (share <= 0.4) return 'بیشترِ لیکوییدها از طرف شورت‌ها بود: فشار از جهش آمد';
+  return 'تقریباً متعادل';
+}
+function coinCard(c, r) {
+  if (r.error) return '<div class="card"><h2>' + c + '</h2><div class="mut">' + r.error + '</div></div>';
+  const row = (lab, o) => '<tr><td>' + lab + '</td><td class="dn">' + usd(o.L) + '</td><td class="up">' + usd(o.S) + '</td><td>' + (isFinite(o.share) ? Math.round(o.share * 100) + '٪' : '—') + '</td></tr>';
+  const sh = isFinite(r.d15.share) ? r.d15.share * 100 : 50;
+  return '<div class="card"><h2>' + c + '</h2>' +
+    '<div class="bar"><i style="width:' + sh.toFixed(0) + '%;background:var(--dn)"></i><i style="width:' + (100 - sh).toFixed(0) + '%;background:var(--up)"></i></div>' +
+    '<div class="mut">۱۵ روز اخیر: قرمز = لانگ‌ها، سبز = شورت‌ها</div>' +
+    '<div class="tw"><table style="margin-top:6px"><tr><th>بازه</th><th>لانگ‌ها</th><th>شورت‌ها</th><th>سهم لانگ</th></tr>' + row('۱۵ روز', r.d15) + row('۳۰ روز', r.d30) + '</table></div>' +
+    '<div style="margin-top:6px">' + sideText(r.d15.share) + '.</div>' +
+    '<div class="mut">شدت نسبت به حد عادیِ همین ارز: ' + Math.round(r.pctMag * 100) + 'ام صدک. آخرین روز کامل: ' + dstr(r.asof) + '.</div></div>';
+}
+function studyCard(st, title) {
+  if (st.error) return '';
+  const verdict = Math.abs(st.t) < 2
+    ? 'در گذشتهٔ بیت‌کوین، این شاخص رابطهٔ معناداری با حرکت ۳۰ روز بعد نداشت (|t|<2). پس تنهایی پیش‌بینی خوبی نیست.'
+    : st.spearman < 0
+      ? 'در گذشته، وقتی این شاخص بالا بود (لانگ‌ها بیشتر له شده بودند)، بازده ۳۰ روز بعد معمولاً بهتر بود؛ یعنی ریزشِ اهرمی گاهی نزدیک ته بود. تضمین نیست.'
+      : 'در گذشته، لیکوییدِ بیشترِ لانگ‌ها معمولاً با ادامهٔ ضعف همراه بود، نه برگشت.';
+  const nm = { low: 'پایین‌ترین ۲۰٪', mid: 'میانه', high: 'بالاترین ۲۰٪' };
+  const rows = ['low', 'mid', 'high'].map((g) => {
+    const b = st.buckets[g];
+    return '<tr><td>' + nm[g] + (st.todayBucket === g ? ' ← امروز' : '') + '</td><td>' + b.days + '</td>' + [7, 30, 90].map((h) => '<td class="' + cls(b['h' + h].med) + '">' + pc(b['h' + h].med) + ' / ' + Math.round(b['h' + h].up * 100) + '٪</td>').join('') + '</tr>';
+  }).join('');
+  return '<div class="card warn"><h2>' + title + '</h2><div class="tw"><table><tr><th>وضعیت شاخص</th><th>روز</th><th>۷ روز بعد</th><th>۳۰ روز بعد</th><th>۹۰ روز بعد</th></tr>' + rows + '</table></div><div class="mut">هر خانه: میانهٔ بازده / سهم روزهای صعودی. آمارهٔ t روی ' + st.n + ' نمونهٔ جدا: ' + st.t.toFixed(1) + '</div><div style="margin-top:6px">' + verdict + '</div></div>';
+}
+
+async function run() {
+  $('go').disabled = true; $('log').innerHTML = ''; $('out').innerHTML = '';
+  try {
+    log('در حال گرفتن لیکویید…');
+    const liq = await fetchLiq();
+    log('لیکویید آمد: ' + Object.keys(liq).join('، '));
+    let html = '', signNote = 'فرض کرده‌ام ستون l همان لانگ است.', d = null;
+    try {
+      log('در حال گرفتن قیمت بیت‌کوین…');
+      const p = await fetchPrice();
+      d = p.d;
+      log('قیمت: ' + d.c.length + ' روز (' + p.kind + ')');
+    } catch (e) { log(e.message, 'dn'); }
+    if (d && liq.BTC) {
+      const probe = buildFeatures(d, { liq: liq.BTC });
+      if (probe.aux) {
+        const sc = liqSignCheck(d, probe.aux);
+        if (sc.corr > 0) { for (const k of Object.keys(liq)) liq[k] = swapMap(liq[k]); signNote = 'در روزهای ریزش ستون s بیشتر بود، پس l و s را جابه‌جا کردم (همبستگی ' + sc.corr.toFixed(2) + ').'; }
+        else signNote = 'سنجش درستی: در روزهای ریزش، لیکوییدِ ستون l بیشتر است (همبستگی ' + sc.corr.toFixed(2) + ' با بازده روزانه)، پس l همان لانگ است.';
+      }
+    }
+    const today = Math.floor(Date.now() / 86400000);
+    html += '<div class="card"><div class="mut">' + signNote + '</div></div>';
+    for (const c of COINS) html += coinCard(c, liq[c] ? coinLiqRadar(liq[c], today) : { error: 'دادهٔ این ارز نیامد.' });
+    if (d && liq.BTC) {
+      const pb = buildFeatures(d, { liq: liq.BTC });
+      html += studyCard(liqStudy(d, pb.cols, 'liqImb15'), 'آیا عدم‌تعادل لیکویید ۱۵ روزه چیزی از آینده می‌گوید؟ (بیت‌کوین)');
+      html += studyCard(liqStudy(d, pb.cols, 'liqMag'), 'آیا شدت لیکویید چیزی از آینده می‌گوید؟ (بیت‌کوین)');
+    }
+    $('out').innerHTML = html;
+    log('تمام شد.');
+  } catch (e) {
+    log('خطا: ' + e.message, 'dn');
+    if (/Failed to fetch|NetworkError|Load failed/i.test(e.message)) log('مرورگر اجازهٔ خواندن مستقیم از Coinalyze را نداد (CORS). به من بگو تا راه دیگری بگذارم.', 'dn');
+  }
+  $('go').disabled = false;
+}
+$('go').onclick = run;
+run();
+</script>
+</body>
+</html>
