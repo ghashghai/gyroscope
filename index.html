@@ -25,6 +25,7 @@ td:first-child,th:first-child{text-align:right}
 #log div{font-size:13px;color:var(--mut)}
 .bar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:6px 0}
 .bar i{display:block;height:100%}
+canvas{width:100%;height:230px;display:block}
 </style>
 </head>
 <body>
@@ -406,6 +407,39 @@ function validate(d, cols, names, opt) {
   };
 }
 
+// ---------- Episodes: big swings found with a zigzag ----------
+function zigzag(c, thr) {
+  const n = c.length, piv = [];
+  let dir = 0, hiI = 0, loI = 0;
+  for (let i = 1; i < n; i++) {
+    if (c[i] > c[hiI]) hiI = i;
+    if (c[i] < c[loI]) loI = i;
+    if (dir >= 0 && c[i] <= c[hiI] * (1 - thr)) { piv.push({ i: hiI, type: 'H' }); dir = -1; loI = i; hiI = i; }
+    else if (dir <= 0 && c[i] >= c[loI] * (1 + thr)) { piv.push({ i: loI, type: 'L' }); dir = 1; hiI = i; loI = i; }
+  }
+  return piv;
+}
+// returns segments [{from,to,type:'up'|'down',move}] between consecutive pivots
+function swingSegments(c, thr) {
+  const p = zigzag(c, thr), seg = [];
+  for (let k = 0; k + 1 < p.length; k++) {
+    const a = p[k], b = p[k + 1];
+    seg.push({ from: a.i, to: b.i, type: b.type === 'H' ? 'up' : 'down', move: c[b.i] / c[a.i] - 1 });
+  }
+  return seg;
+}
+// analog forecast at day t using only data known at t (pool outcomes must be complete by t)
+function predictAt(d, cols, names, t, opt) {
+  opt = Object.assign({ K: 15, gap: 14, h: 30 }, opt || {});
+  for (const nm of names) if (!isFinite(cols[nm][t])) return null;
+  const pool = validRows(cols, names, 0, t - 90);
+  if (pool.length < 300) return null;
+  const sc = scaleFit(cols, names, pool);
+  const nb = neighbors(cols, names, pool, t, sc, opt.K, opt.gap);
+  const rets = nb.map((o) => fwdRet(d.c, o.i, opt.h));
+  return { med: median(rets), up: summarize(rets).up, n: nb.length };
+}
+
 </script>
 <script>
 var COINS = ['BTC', 'ETH', 'BNB', 'SUI'];
@@ -427,7 +461,7 @@ async function getJSON(url) {
   } finally { clearTimeout(t); }
 }
 
-async function fetchPrice() {
+async function fetchPriceBinance() {
   // spot first (longer history); perp as fallback
   const hosts = [
     ['https://api.binance.com/api/v3/klines', 'spot'],
@@ -453,6 +487,22 @@ async function fetchPrice() {
     } catch (e) { lastErr = e; }
   }
   throw new Error('قیمت بیت‌کوین از بایننس نیامد: ' + (lastErr && lastErr.message));
+}
+
+async function fetchPrice() {
+  try {
+    const j = await getJSON('https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&allData=true');
+    const all = (j.Data && j.Data.Data) || [];
+    const today0 = Math.floor(Date.now() / 86400000) * 86400;
+    const seen = new Set(), rows = [];
+    for (const x of all) { if (!(x.close > 0) || seen.has(x.time) || x.time >= today0) continue; seen.add(x.time); rows.push(x); }
+    rows.sort((a, b) => a.time - b.time);
+    if (rows.length < 1500) throw new Error('تاریخچه کوتاه است');
+    return { kind: 'cryptocompare', d: { t: rows.map((x) => x.time), c: rows.map((x) => x.close), h: rows.map((x) => x.high), l: rows.map((x) => x.low), v: rows.map((x) => x.volumeto) } };
+  } catch (e) {
+    log('تاریخچه کامل از CryptoCompare نیامد؛ از بایننس می‌گیرم (از ۲۰۱۹).', 'dn');
+    return fetchPriceBinance();
+  }
 }
 
 async function fetchLiq() {
@@ -508,6 +558,66 @@ function studyCard(st, title) {
   return '<div class="card warn"><h2>' + title + '</h2><div class="tw"><table><tr><th>وضعیت شاخص</th><th>روز</th><th>۷ روز بعد</th><th>۳۰ روز بعد</th><th>۹۰ روز بعد</th></tr>' + rows + '</table></div><div class="mut">هر خانه: میانهٔ بازده / سهم روزهای صعودی. آمارهٔ t روی ' + st.n + ' نمونهٔ جدا: ' + st.t.toFixed(1) + '</div><div style="margin-top:6px">' + verdict + '</div></div>';
 }
 
+
+let EPI = null;
+function episodesCard(d, liq) {
+  const c = d.c, n = c.length;
+  const segs = swingSegments(c, 0.30).filter((s) => s.type === 'up' ? s.move >= 1.0 : s.move <= -0.4);
+  if (!segs.length) return '';
+  const pb = buildFeatures(d, {});
+  const lb = liq && liq.BTC ? buildFeatures(d, { liq: liq.BTC }) : null;
+  const rows = [], res = { down: { n: 0, hit: 0 }, up: { n: 0, hit: 0 } };
+  for (const s of segs) {
+    const pr = predictAt(d, pb.cols, pb.names, s.from);
+    const a30 = fwdRet(c, s.from, 30);
+    const f = (nm, fmt) => isFinite(pb.cols[nm][s.from]) ? fmt(pb.cols[nm][s.from]) : '—';
+    const li = lb && isFinite(lb.cols.liqImb15[s.from]) ? Math.round(lb.cols.liqImb15[s.from] * 100) + '٪' : '—';
+    let flag = '—';
+    if (pr) {
+      res[s.type].n++;
+      const ok = s.type === 'down' ? pr.med < 0 : pr.med > 0;
+      if (ok) res[s.type].hit++;
+      flag = ok ? '✓' : '✗';
+    }
+    rows.push('<tr><td>' + dstr(d.t[s.from]) + '</td><td class="' + (s.type === 'up' ? 'up' : 'dn') + '">' + (s.type === 'up' ? 'صعود' : 'سقوط') + ' ' + (s.move * 100).toFixed(0) + '٪</td><td>' + (s.to - s.from) + ' روز</td>' +
+      '<td>' + f('sma150', (x) => ((Math.exp(x) - 1) * 100).toFixed(0) + '٪') + '</td><td>' + f('dd', (x) => (x * 100).toFixed(0) + '٪') + '</td><td>' + li + '</td>' +
+      '<td>' + (pr ? pc(pr.med) : '—') + '</td><td class="' + cls(a30) + '">' + pc(a30) + '</td><td>' + flag + '</td></tr>');
+  }
+  EPI = { d, segs };
+  const sum = (k, lab) => res[k].n ? lab + ': ' + res[k].hit + ' از ' + res[k].n : '';
+  return '<div class="card"><h2>نقشهٔ ۱۵ ساله: صعودها و سقوط‌های شدید</h2><canvas id="cvEpi"></canvas>' +
+    '<div class="mut">قرمز = سقوط بیش از ۴۰٪، سبز = صعود بیش از ۱۰۰٪ (مقیاس لگاریتمی). هر قطعه از قله یا دره‌ای شروع می‌شود که نمودار از آن‌جا برگشته.</div></div>' +
+    '<div class="card warn"><h2>رادار در آغاز هر حرکت چه می‌گفت؟</h2><div class="tw"><table><tr><th>تاریخ آغاز</th><th>حرکت بعدی</th><th>مدت</th><th>فاصله از SMA150</th><th>افت از سقف سال</th><th>لیکویید لانگ (۱۵ روز)</th><th>پیش‌بینی ۳۰ روز</th><th>واقعی ۳۰ روز</th><th>درست؟</th></tr>' + rows.join('') + '</table></div>' +
+    '<div style="margin-top:8px">' + [sum('down', 'سقوط‌هایی که رادار «ریزش» گفت'), sum('up', 'صعودهایی که رادار «صعود» گفت')].filter(Boolean).join('، ') + '.</div>' +
+    '<div class="mut">در هر ردیف، پیش‌بینی فقط با داده‌ای ساخته شده که همان روز موجود بود. پنجاه‌پنجاه یعنی شیر یا خط. ستون لیکویید فقط از ۲۰۱۹ هست. این پیش‌بینی ۳۰ روزه است، نه کل حرکت.</div></div>';
+}
+function drawEpisodes() {
+  const cv = document.getElementById('cvEpi');
+  if (!cv || !EPI) return;
+  const { d, segs } = EPI, c = d.c, n = c.length;
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  const lo = Math.log(Math.min(...c)), hi = Math.log(Math.max(...c)), L = 8, R = W - 8, T = 8, B = H - 22;
+  const X = (i) => L + (i / (n - 1)) * (R - L), Y = (p) => B - ((Math.log(p) - lo) / (hi - lo)) * (B - T);
+  g.strokeStyle = '#6b7390'; g.lineWidth = 1; g.beginPath();
+  const step = Math.max(1, Math.floor(n / (R - L)));
+  for (let i = 0; i < n; i += step) { const x = X(i), y = Y(c[i]); i ? g.lineTo(x, y) : g.moveTo(x, y); }
+  g.stroke();
+  g.lineWidth = 2.5;
+  for (const s of segs) {
+    g.strokeStyle = s.type === 'up' ? '#43b985' : '#e8645d'; g.beginPath();
+    for (let i = s.from; i <= s.to; i += Math.max(1, step)) { const x = X(i), y = Y(c[i]); i === s.from ? g.moveTo(x, y) : g.lineTo(x, y); }
+    g.lineTo(X(s.to), Y(c[s.to])); g.stroke();
+  }
+  g.fillStyle = '#9ca3bb'; g.font = '11px sans-serif'; g.textAlign = 'center';
+  let lastY = -1;
+  for (let i = 0; i < n; i++) {
+    const y = new Date(d.t[i] * 1000).getUTCFullYear();
+    if (y !== lastY) { lastY = y; if (y % 2 === 0) g.fillText(String(y), X(i), H - 6); }
+  }
+}
+
 async function run() {
   $('go').disabled = true; $('log').innerHTML = ''; $('out').innerHTML = '';
   try {
@@ -537,7 +647,9 @@ async function run() {
       html += studyCard(liqStudy(d, pb.cols, 'liqImb15'), 'آیا عدم‌تعادل لیکویید ۱۵ روزه چیزی از آینده می‌گوید؟ (بیت‌کوین)');
       html += studyCard(liqStudy(d, pb.cols, 'liqMag'), 'آیا شدت لیکویید چیزی از آینده می‌گوید؟ (بیت‌کوین)');
     }
+    if (d) html += episodesCard(d, liq);
     $('out').innerHTML = html;
+    drawEpisodes();
     log('تمام شد.');
   } catch (e) {
     log('خطا: ' + e.message, 'dn');
