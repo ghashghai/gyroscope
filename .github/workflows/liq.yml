@@ -1,4 +1,4 @@
-name: Update liquidation data
+name: Update market data
 on:
   workflow_dispatch:
   schedule:
@@ -6,6 +6,7 @@ on:
   push:
     paths:
       - '.github/workflows/liq.yml'
+      - 'scripts/fetch.py'
 permissions:
   contents: write
 jobs:
@@ -13,26 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch Coinalyze liquidations
+      - name: Fetch data
         env:
           KEY: 322170a1-8172-4349-83cd-7fca61183feb
-        run: |
-          NOW=$(date +%s)
-          SYMS="BTCUSDT_PERP.A,ETHUSDT_PERP.A,BNBUSDT_PERP.A,SUIUSDT_PERP.A"
-          curl -fsS --retry 3 --retry-delay 10 \
-            "https://api.coinalyze.net/v1/liquidation-history?symbols=${SYMS}&interval=daily&from=1546300800&to=${NOW}&convert_to_usd=true&api_key=${KEY}" \
-            -o raw.json
-          python3 - <<'PY'
-          import json, time
-          d = json.load(open('raw.json'))
-          assert isinstance(d, list) and len(d) > 0, 'bad response'
-          json.dump({'fetched': int(time.time()), 'data': d}, open('liq.json', 'w'))
-          PY
-          rm raw.json
+        run: python3 scripts/fetch.py
       - name: Commit
         run: |
           git config user.name "github-actions"
           git config user.email "actions@users.noreply.github.com"
-          git add liq.json
-          git diff --cached --quiet || git commit -m "Update liquidation data"
+          git add liq.json oi.json funding.json lsr.json price.json meta.json
+          git diff --cached --quiet || git commit -m "Update market data"
+          git pull --rebase -q origin main || true
           git push
