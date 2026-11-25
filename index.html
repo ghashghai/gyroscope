@@ -168,9 +168,36 @@ function swingCard(S) {
   }
   const med = (a) => { if (!a.length) return NaN; const b = a.slice().sort((x, y) => x - y); return b[Math.floor((b.length - 1) / 2)]; };
   window.__segs = segs; window.__S = S;
-  return '<div class="card"><h2>نقشهٔ بیت‌کوین از ' + dstr(S.d[0] * 86400) + '</h2><canvas id="cv"></canvas><div class="mut">قرمز = سقوط بیش از ۴۰٪، سبز = صعود بیش از ۱۰۰٪. مقیاس لگاریتمی.</div></div>' +
+  return '<div class="card"><h2>نقشهٔ بیت‌کوین از ' + dstr(S.d[0] * 86400) + '</h2><canvas id="cv"></canvas><div class="mut">قرمز = سقوط بیش از ۴۰٪، سبز = صعود بیش از ۱۰۰٪. مقیاس لگاریتمی.<br>نقطهٔ زرد = قلهٔ هر چرخه، خط‌چین عمودی = مرز چرخه.</div></div>' +
+    '<div class="card"><h2>فیبوناچی چرخهٔ فعلی</h2><canvas id="cv2"></canvas><div class="mut">از کف ۲۰۲۲ تا قلهٔ ۲۰۲۵. فیبوناچی اینجا نقشه و نماد است، نه سیگنال خرید و فروش؛ در سه چرخهٔ قبل کف‌ها روی ۰٫۶۱۸ نایستادند.</div></div>' +
     '<div class="card"><h2>قانون میانگین ۱۵۰ روزه در هر سقوط و صعود</h2><div class="tw"><table><tr><th>آغاز</th><th>حرکت</th><th>نتیجهٔ قانون</th></tr>' + rows.join('') + '</table></div>' +
     '<div style="margin-top:8px">از ' + avs.length + ' سقوط بیش از ۴۰٪ از سال ۲۰۱۳، میانهٔ سهم سقوطی که با قانون در امان ماند: ' + pct(med(avs)) + '. از ' + caps.length + ' صعود بیش از ۱۰۰٪، میانهٔ سهم صعودی که گرفته شد: ' + pct(med(caps)) + '.</div><div class="mut" style="margin-top:6px">خروج یعنی نخستین روزی که قیمت از میانگین ۱۵۰ روزه پایین‌تر بسته شد. «در امان» یعنی چه بخشی از سقوط بعد از خروج رخ داد. کارمزد و لغزش قیمت را حساب نکرده‌ام.</div></div>';
+}
+function drawCycle(dd, lowIn, rng) {
+  const cv = $('cv2'); if (!cv || !window.__S) return;
+  const S = window.__S, c = S.c, n = c.length;
+  const lw = lowIn(dd(2022,11,1), dd(2023,3,1)), pk = rng(dd(2024,1,1), dd(2026,12,31));
+  if (lw < 0 || pk < 0) return;
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  const A = c[lw], Z = c[pk], i0 = lw, L = 8, R = W - 8, T = 10, B = H - 20;
+  const lo = Math.log(A * 0.9), hi = Math.log(Z * 1.06);
+  const X = (i) => L + ((i - i0) / (n - 1 - i0)) * (R - L), Y = (p) => B - ((Math.log(p) - lo) / (hi - lo)) * (B - T);
+  const lv = [[0.382, 'rgba(217,180,91,.8)'], [0.5, 'rgba(217,180,91,.8)'], [0.618, '#f0d27a'], [0.786, 'rgba(217,180,91,.8)']];
+  g.font = '11px sans-serif'; g.textAlign = 'left';
+  for (const [r, col] of lv) {
+    const p = Z - r * (Z - A), y = Y(p);
+    g.setLineDash([5, 4]); g.strokeStyle = col; g.lineWidth = r === 0.618 ? 1.8 : 1; g.beginPath(); g.moveTo(L, y); g.lineTo(R, y); g.stroke();
+    g.setLineDash([]); g.fillStyle = col; g.fillText(r + ' ← ' + Math.round(p / 1000) + 'k', L + 2, y - 3);
+  }
+  g.strokeStyle = '#6b7390'; g.lineWidth = 1.6; g.beginPath();
+  for (let i = i0; i < n; i++) { const x = X(i), y = Y(c[i]); i === i0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke();
+  g.fillStyle = '#d9b45b'; g.beginPath(); g.arc(X(pk), Y(Z), 4, 0, 6.3); g.fill();
+  g.fillStyle = '#ebe8df'; g.beginPath(); g.arc(X(n - 1), Y(c[n - 1]), 4, 0, 6.3); g.fill();
+  g.fillStyle = '#9ca3bb'; g.textAlign = 'center'; g.fillText('قله ' + Math.round(Z / 1000) + 'k', X(pk), Math.max(10, Y(Z) - 8));
+  g.textAlign = 'right'; g.fillText('امروز ' + Math.round(c[n - 1] / 1000) + 'k', R, Math.min(H - 6, Y(c[n - 1]) + 16));
+  g.fillStyle = '#9ca3bb'; g.textAlign = 'center'; let ly = -1;
+  for (let i = i0; i < n; i++) { const y = new Date(S.d[i] * 86400000).getUTCFullYear(); if (y !== ly) { ly = y; if (i - i0 > 90) g.fillText(String(y), X(i) + 12, H - 5); } }
 }
 function drawSwing() {
   const cv = $('cv'); if (!cv || !window.__S) return;
@@ -184,6 +211,16 @@ function drawSwing() {
   for (let i = 0; i < n; i += step) { const x = X(i), y = Y(c[i]); i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
   g.lineWidth = 2.5;
   for (const s of segs) { g.strokeStyle = s.down ? '#e8645d' : '#43b985'; g.beginPath(); for (let i = s.from; i <= s.to; i += step) { const x = X(i), y = Y(c[i]); i === s.from ? g.moveTo(x, y) : g.lineTo(x, y); } g.lineTo(X(s.to), Y(c[s.to])); g.stroke(); }
+  // symbolic layer: cycle peaks, dividers, Fibonacci of the current cycle (map only, not a signal)
+  const dd = (y, m, d) => Date.UTC(y, m - 1, d) / 86400000;
+  const rng = (a, b) => { let bi = -1; for (let i = 0; i < n; i++) if (S.d[i] >= a && S.d[i] <= b && (bi < 0 || c[i] > c[bi])) bi = i; return bi; };
+  const lowIn = (a, b) => { let bi = -1; for (let i = 0; i < n; i++) if (S.d[i] >= a && S.d[i] <= b && (bi < 0 || c[i] < c[bi])) bi = i; return bi; };
+  const peaks = [rng(dd(2013,10,1), dd(2013,12,31)), rng(dd(2017,6,1), dd(2018,1,31)), rng(dd(2021,3,1), dd(2021,12,31)), rng(dd(2024,1,1), dd(2026,12,31))].filter((i) => i >= 0);
+  g.setLineDash([3, 4]); g.strokeStyle = 'rgba(156,163,187,.45)'; g.lineWidth = 1;
+  for (const i of peaks) { g.beginPath(); g.moveTo(X(i), T); g.lineTo(X(i), B); g.stroke(); }
+  g.setLineDash([]); g.fillStyle = '#d9b45b';
+  for (const i of peaks) { g.beginPath(); g.arc(X(i), Y(c[i]), 3.5, 0, 6.3); g.fill(); }
+  drawCycle(dd, lowIn, rng);
   g.fillStyle = '#9ca3bb'; g.font = '11px sans-serif'; g.textAlign = 'center';
   let ly = -1; for (let i = 0; i < n; i++) { const y = new Date(S.d[i] * 86400000).getUTCFullYear(); if (y !== ly) { ly = y; if (y % 2 === 0) g.fillText(String(y), X(i), H - 6); } }
 }
