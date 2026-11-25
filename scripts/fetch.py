@@ -133,5 +133,23 @@ for nm in ('usdt_eth', 'usdt_trx'):
     except Exception as e:
         meta['status'][nm] = 'FAILED: %s' % e
 
+
+# USDT total circulating supply, daily, fresh (DefiLlama public API, no key)
+try:
+    raw5 = urllib.request.urlopen(urllib.request.Request('https://stablecoins.llama.fi/stablecoincharts/all?stablecoin=1', headers={'User-Agent': 'gyroscope-radar'}), timeout=120).read().decode()
+    j5 = json.loads(raw5)
+    rows5 = []
+    for r in j5:
+        try:
+            v = r['totalCirculatingUSD']['peggedUSD'] if 'totalCirculatingUSD' in r else r['totalCirculating']['peggedUSD']
+            rows5.append([int(r['date']), float(v)])
+        except Exception:
+            pass
+    assert rows5, 'no rows'
+    json.dump({'cols': ['t', 'usdt'], 'rows': rows5}, open('usdt_supply.json', 'w'), separators=(',', ':'))
+    meta['status']['usdt_supply'] = '%d rows, last %s = %.1fB' % (len(rows5), time.strftime('%Y-%m-%d', time.gmtime(rows5[-1][0])), rows5[-1][1] / 1e9)
+except Exception as e:
+    meta['status']['usdt_supply'] = 'FAILED: %s' % e
+
 json.dump(meta, open('meta.json', 'w'), indent=1)
 print(json.dumps(meta, indent=1))

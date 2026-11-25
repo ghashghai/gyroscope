@@ -247,7 +247,7 @@ function drawSwing() {
 let SIMMODE = 'hist';
 function rnd(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function simCard() {
-  return '<div class="card"><h2>مسیرهای فرضی یک سال آینده</h2><div style="margin:6px 0"><button id="sb1" onclick="setSim(\'hist\')">با روند تاریخی</button> <button id="sb2" onclick="setSim(\'flat\')" style="background:var(--mut)">بدون روند (خنثی)</button></div><canvas id="cv3" style="height:260px"></canvas><div id="simtxt" style="margin-top:8px"></div>' +
+  return '<div class="card"><h2>مسیرهای فرضی یک سال آینده</h2><div style="margin:6px 0"><button id="sb1" onclick="setSim(\'hist\')">با روند تاریخی</button> <button id="sb2" onclick="setSim(\'flat\')" style="background:var(--mut)">بدون روند (خنثی)</button> <button id="sb3" onclick="setSim(\'analog\')" style="background:var(--mut)">شبیه امروز</button></div><canvas id="cv3" style="height:260px"></canvas><div id="simtxt" style="margin-top:8px"></div>' +
     '<div class="mut" style="margin-top:6px">هر مسیر از ۱۰ تکه ۳۶ روزه ساخته شده که تصادفی از خود نمودار بیت‌کوین (از ۲۰۱۵) برداشته‌ام. این حدس‌های ممکن‌اند، نه پیش‌بینی. «با روند تاریخی» خوش‌بینانه است، چون بیت‌کوین در این سال‌ها خیلی بالا رفته؛ «خنثی» روند میانگین را برمی‌دارد و فقط شکل نوسان و شکاف‌ها را نگه می‌دارد.</div></div>';
 }
 function setSim(m) { SIMMODE = m; drawSim(); }
@@ -258,7 +258,10 @@ function drawSim() {
   const r = []; for (let i = st + 1; i < n; i++) r.push(Math.log(c[i] / c[i - 1]));
   const mu = r.reduce((a, b) => a + b, 0) / r.length, sub = SIMMODE === 'flat' ? mu : 0;
   const BL = 36, NB = 10, H = BL * NB, rand = rnd(Math.floor(Date.now() / 86400000) + 7), NP = 2000, paths = [];
-  for (let k = 0; k < NP; k++) { const q = [p0]; for (let b = 0; b < NB; b++) { const s0 = Math.floor(rand() * (r.length - BL)); for (let j = 0; j < BL; j++) q.push(q[q.length - 1] * Math.exp(r[s0 + j] - sub)); } paths.push(q); }
+  let elig = [];
+  if (SIMMODE === 'analog') { const sm = smaArr(c, 150); for (let i = Math.max(st, 200); i < n - BL - 1; i++) { let mx = 0; for (let j = i - 90; j <= i; j++) mx = Math.max(mx, c[j]); if (c[i] < sm[i] && c[i] / mx - 1 < -0.2) elig.push(i - st); } }
+  if (SIMMODE === 'analog' && elig.length < 50) SIMMODE = 'hist';
+  for (let k = 0; k < NP; k++) { const q = [p0]; for (let b = 0; b < NB; b++) { const s0 = SIMMODE === 'analog' ? elig[Math.floor(rand() * elig.length)] : Math.floor(rand() * (r.length - BL)); for (let j = 0; j < BL; j++) q.push(q[q.length - 1] * Math.exp(r[s0 + j] - sub)); } paths.push(q); }
   const pct = (t, f) => { const a = paths.map((q) => q[t]).sort((x, y) => x - y); return a[Math.floor(f * (a.length - 1))]; };
   const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, Hh = cv.clientHeight;
   cv.width = W * dpr; cv.height = Hh * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
@@ -275,7 +278,7 @@ function drawSim() {
   const end = paths.map((q) => q[H]), up = end.filter((v) => v > p0).length / NP, min = paths.map((q) => Math.min(...q));
   const f = (v) => Math.round(v / 1000) + 'k', pc = (x) => Math.round(x * 100) + '٪';
   $('simtxt').innerHTML = 'یک سال بعد (۲۰۰۰ مسیر): ۱۰٪ بدترین ≈ <b>' + f(pct(H, 0.1)) + '</b>، میانه ≈ <b>' + f(pct(H, 0.5)) + '</b>، ۱۰٪ بهترین ≈ <b>' + f(pct(H, 0.9)) + '</b>.<br>احتمال بالاتر از امروز (' + f(p0) + '): ' + pc(up) + '. احتمال لمس ۴۲k در مسیر: ' + pc(min.filter((v) => v < 42000).length / NP) + '. احتمال لمس ۳۹k: ' + pc(min.filter((v) => v < 39068).length / NP) + '. احتمال رسیدن به ۱۵۰k در مسیر: ' + pc(paths.filter((q) => Math.max(...q) > 150000).length / NP) + '.';
-  $('sb1').style.background = SIMMODE === 'hist' ? 'var(--gold)' : 'var(--mut)'; $('sb2').style.background = SIMMODE === 'flat' ? 'var(--gold)' : 'var(--mut)';
+  $('sb1').style.background = SIMMODE === 'hist' ? 'var(--gold)' : 'var(--mut)'; $('sb2').style.background = SIMMODE === 'flat' ? 'var(--gold)' : 'var(--mut)'; $('sb3').style.background = SIMMODE === 'analog' ? 'var(--gold)' : 'var(--mut)'; if (SIMMODE === 'analog') $('simtxt').innerHTML += '<br><span class="mut">«شبیه امروز»: تکه‌ها فقط از روزهایی برداشته شده که مثل امروز زیر میانگین ۱۵۰ روزه بودند و بیش از ۲۰٪ از سقف ۹۰ روز افت داشتند (' + elig.length + ' روز).</span>';
 }
 
 const BACKTEST = '<div class="card"><h2>آزمون واقعی: این قاعده‌ها چه کردند؟</h2>' +
