@@ -184,7 +184,7 @@ function mvrvCard(S, oc) {
   if (!last) return '';
   const day = Math.floor(last[0] / 86400), n = S.c.length; let ix = -1; for (let i = n - 1; i >= 0; i--) if (S.d[i] <= day) { ix = i; break; }
   if (ix < 0) return '';
-  const mv = last[ci], rp = S.c[ix] / mv, est = S.c[n - 1] / rp, f = (x) => Math.round(x).toLocaleString('en-US');
+  const mv = last[ci], rp = S.c[ix] / mv; window.__rp = rp; const est = S.c[n - 1] / rp, f = (x) => Math.round(x).toLocaleString('en-US');
   const vd = est < 1 ? ['v-g', 'منطقهٔ کف تاریخی: بازار زیر قیمت خرید دارندگان'] : est < 1.5 ? ['v-y', 'نزدیک کف، ولی هنوز به زیر ۱ نرسیده'] : est < 3 ? ['v-y', 'میانه'] : ['v-r', 'منطقهٔ داغ (قله‌های قبلی بالای ۳)'];
   return '<div class="card"><h2>ارزش: MVRV بیت‌کوین</h2>' +
     '<div class="' + vd[0] + '" style="font-weight:700;font-size:18px">تخمین امروز ≈ ' + est.toFixed(2) + ' — ' + vd[1] + '</div>' +
@@ -215,6 +215,19 @@ function parabolaCard(S) {
   return '<div class="card"><h2>هشدار شتاب (پیش از سقوط ناگهانی)</h2><div class="' + (on ? 'v-r' : 'v-g') + '" style="font-weight:700;font-size:18px">' + (on ? 'روشن: بازار پرشتاب و پرنوسان است' : 'خاموش: امروز نشانهٔ شتاب بالا نیست') + '</div>' +
     '<div class="tw"><table><tr><th>فاصله از میانگین ۱۵۰ روزه</th><td>' + f(dist) + ' (شرط روشن شدن: بیش از ۱۰۰٪)</td></tr><tr><th>رتبهٔ نوسان ۳۰ روزه در تاریخ</th><td>' + f(vp) + ' (شرط: بیش از ۸۵٪)</td></tr></table></div>' +
     '<div class="mut" style="margin-top:6px">چهار سقوط ناگهانی تاریخ (۲۰۱۳ دو بار، ۲۰۱۸ دو بار) بعد از جهش شدید بودند: میانهٔ فاصله از میانگین ۱۱۸٪ و رتبهٔ نوسان ۹۰٪. وقتی هر دو شرط با هم روشن بودند، در ۷۱٪ مواقع ظرف ۳۰ روز بیش از ۲۰٪ افت آمد (حالت عادی ۱۵٪). ولی این فقط ۳ دوره (۳۵ روز) از ۲۰۱۵ به بعد بود، پس فرضیه است نه قانون.</div></div>';
+}
+function partsCard(S) {
+  const c = S.c, n = c.length, p = c[n - 1], rp = window.__rp, sm = smaArr(c, 150)[n - 1];
+  if (!rp) return '';
+  const f = (x) => Math.round(x).toLocaleString('en-US');
+  const L = [[57356, 'فیبوناچی ۰٫۶۱۸ — «تصحیح کوچک» تو', 'پارت کوچک'], [rp, 'MVRV=۱ (قیمت خرید میانگین دارندگان)', 'پارت کوچک'], [rp * 0.8, 'MVRV=۰٫۸ (تنها نشانهٔ کف قوی در آزمون)', 'پارت اصلی'], [42000, 'محور ۴۲k تو', 'پارت اصلی'], [39068, 'فیبوناچی ۰٫۷۸۶', 'پارت اصلی'], [rp * 0.7, 'MVRV=۰٫۷ (کف‌های ۲۰۱۵ و ۲۰۱۸)', 'پارت اصلی']];
+  let rows = '', k = 1;
+  for (const [lv, why, kind] of L) { const hit = p <= lv; rows += '<tr><th>' + (k++) + '</th><td>' + f(lv) + ' دلار</td><td>' + why + '</td><td style="color:' + (hit ? '#4cd08a' : '#9ca3bb') + '">' + (hit ? 'رسیده' : ('قیمت ' + ((p / lv - 1) * 100).toFixed(0) + '٪ بالاتر از آن')) + '</td></tr>'; }
+  rows += '<tr><th>۷</th><td>' + f(sm) + ' دلار</td><td>ذخیره: فقط وقتی قیمت بالای میانگین ۱۵۰ روزه ببندد (تأیید روند)</td><td style="color:#9ca3bb">' + (((sm / p - 1) * 100).toFixed(0)) + '٪ بالاتر</td></tr>';
+  return '<div class="card"><h2>هفت پارت بیت‌کوین (پیشنهاد)</h2><div class="tw"><table>' + rows + '</table></div>' +
+    '<div style="margin-top:8px"><b>خروج:</b> قیمت زیر میانگین ۱۵۰ روزه بسته شود یا هشدار شتاب روشن شود ← پارت‌ها به تتر برمی‌گردند.</div>' +
+    '<div style="margin-top:8px"><b>آزمون این نردبان روی ۴ کف تاریخی</b> (با MVRV: ۱٫۰ یک پارت، ۰٫۸۵ یک، ۰٫۸ دو، ۰٫۷ دو):<br>۲۰۱۴–۱۵: میانگین خرید ۳۲٪ بالاتر از کف؛ بعد از اولین خرید باز ۴۷٪ افت.<br>۲۰۱۸–۱۹: ۱۸٪ بالاتر از کف؛ بعد از اولین خرید ۳۴٪ افت.<br>۲۰۲۰: فقط یک پارت پر شد، همان روز کف.<br>۲۰۲۲–۲۳: ۱۶٪ بالاتر از کف؛ بعد از اولین خرید ۳۰٪ افت.</div>' +
+    '<div class="mut" style="margin-top:6px">یعنی اولین خریدها در سه چرخه از چهار، ۳۰ تا ۴۷٪ زودتر از کف بودند. به همین دلیل دو پارت اول کوچک‌اند و بقیه برای قیمت‌های پایین‌تر. هر چهار چرخه بعد از آن بالا رفتند، ولی نمونه چهارتاست، و این پیش‌بینی نیست. پله‌ها با داده تازه MVRV دوباره محاسبه می‌شوند.</div></div>';
 }
 function drawCycle(dd, lowIn, rng) {
   const cv = $('cv2'); if (!cv || !window.__S) return;
@@ -318,7 +331,7 @@ function drawSim() {
   g.fillStyle = '#9ca3bb'; g.textAlign = 'center'; g.fillText('امروز', X(back), Hh - 6); g.fillText('+۱ سال', X(tot) - 14, Hh - 6);
   const end = paths.map((q) => q[H]), up = end.filter((v) => v > p0).length / NP, min = paths.map((q) => Math.min(...q));
   const f = (v) => Math.round(v / 1000) + 'k', pc = (x) => Math.round(x * 100) + '٪';
-  $('simtxt').innerHTML = 'یک سال بعد (۲۰۰۰ مسیر): ۱۰٪ بدترین ≈ <b>' + f(pct(H, 0.1)) + '</b>، میانه ≈ <b>' + f(pct(H, 0.5)) + '</b>، ۱۰٪ بهترین ≈ <b>' + f(pct(H, 0.9)) + '</b>.<br>احتمال بالاتر از امروز (' + f(p0) + '): ' + pc(up) + '. احتمال لمس ۴۲k در مسیر: ' + pc(min.filter((v) => v < 42000).length / NP) + '. احتمال لمس ۳۹k: ' + pc(min.filter((v) => v < 39068).length / NP) + '. احتمال رسیدن به ۱۵۰k در مسیر: ' + pc(paths.filter((q) => Math.max(...q) > 150000).length / NP) + '.<br><b>روز ریزش</b> (نقطهٔ قرمز = اولین روزی که مسیر ۳۰٪ از سقف خودش افت می‌کند): در ' + pc(crash.length / NP) + ' مسیرها رخ می‌دهد؛ میانه‌اش ' + Math.round(med(crash)) + ' روز بعد از امروز. در ' + pc(outCnt / Math.max(1, crash.length)) + ' از این ریزش‌ها قانون از قبل بیرون بود (زیر میانگین)؛ در بقیه، قانون ۱۵۰ روزه میانه ' + Math.round(med(exitD)) + ' روز بعد از سقف خارج می‌شود و میانهٔ سهم سقوطی که در امان می‌ماند ' + pc(med(avoid)) + ' است.';
+  $('simtxt').innerHTML = 'یک سال بعد (۲۰۰۰ مسیر): ۱۰٪ بدترین ≈ <b>' + f(pct(H, 0.1)) + '</b>، میانه ≈ <b>' + f(pct(H, 0.5)) + '</b>، ۱۰٪ بهترین ≈ <b>' + f(pct(H, 0.9)) + '</b>.<br>احتمال بالاتر از امروز (' + f(p0) + '): ' + pc(up) + '. احتمال لمس ۵۷k در مسیر: ' + pc(min.filter((v) => v < 57356).length / NP) + '. احتمال لمس ۴۲k در مسیر: ' + pc(min.filter((v) => v < 42000).length / NP) + '. احتمال لمس ۳۹k: ' + pc(min.filter((v) => v < 39068).length / NP) + '. احتمال رسیدن به ۱۵۰k در مسیر: ' + pc(paths.filter((q) => Math.max(...q) > 150000).length / NP) + '.<br><b>روز ریزش</b> (نقطهٔ قرمز = اولین روزی که مسیر ۳۰٪ از سقف خودش افت می‌کند): در ' + pc(crash.length / NP) + ' مسیرها رخ می‌دهد؛ میانه‌اش ' + Math.round(med(crash)) + ' روز بعد از امروز. در ' + pc(outCnt / Math.max(1, crash.length)) + ' از این ریزش‌ها قانون از قبل بیرون بود (زیر میانگین)؛ در بقیه، قانون ۱۵۰ روزه میانه ' + Math.round(med(exitD)) + ' روز بعد از سقف خارج می‌شود و میانهٔ سهم سقوطی که در امان می‌ماند ' + pc(med(avoid)) + ' است.';
   $('sb1').style.background = SIMMODE === 'hist' ? 'var(--gold)' : 'var(--mut)'; $('sb2').style.background = SIMMODE === 'flat' ? 'var(--gold)' : 'var(--mut)'; $('sb3').style.background = SIMMODE === 'analog' ? 'var(--gold)' : 'var(--mut)'; if (SIMMODE === 'analog') $('simtxt').innerHTML += '<br><span class="mut">«شبیه امروز»: تکه‌ها فقط از روزهایی برداشته شده که مثل امروز زیر میانگین ۱۵۰ روزه بودند و بیش از ۲۰٪ از سقف ۹۰ روز افت داشتند (' + elig.length + ' روز).</span>';
 }
 
@@ -355,7 +368,7 @@ async function run() {
       html += coinCard(coinState(sym, S, aux));
     }
     html += BACKTEST;
-    if (btc) html += mvrvCard(btc, onch) + swingCard(btc) + simCard();
+    if (btc) html += mvrvCard(btc, onch) + partsCard(btc) + swingCard(btc) + simCard();
     $('out').innerHTML = html; drawSwing(); drawSim();
   } catch (e) { log('خطا: ' + e.message, 'dn'); }
   $('go').disabled = false;
