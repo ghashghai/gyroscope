@@ -1,5 +1,5 @@
 {
- "fetched": 1795570524,
+ "fetched": 1795573958,
  "status": {
   "liquidation-history": {
    "BNBUSDT_PERP.A": 1506,
@@ -32,16 +32,16 @@
    "SUIUSDT_PERP.A": 1303
   },
   "ohlcv1h.json": {
-   "BNBUSDT_PERP.A": 1920,
-   "BTCUSDT_PERP.A": 1920,
-   "ETHUSDT_PERP.A": 1920,
-   "SUIUSDT_PERP.A": 1920
+   "BNBUSDT_PERP.A": 1921,
+   "BTCUSDT_PERP.A": 1921,
+   "ETHUSDT_PERP.A": 1921,
+   "SUIUSDT_PERP.A": 1921
   },
   "liq1h.json": {
-   "BNBUSDT_PERP.A": 1561,
-   "BTCUSDT_PERP.A": 1614,
-   "ETHUSDT_PERP.A": 1602,
-   "SUIUSDT_PERP.A": 1771
+   "BNBUSDT_PERP.A": 1562,
+   "BTCUSDT_PERP.A": 1615,
+   "ETHUSDT_PERP.A": 1603,
+   "SUIUSDT_PERP.A": 1772
   },
   "price": "5789 rows, 2010-07-18 .. 2026-05-23, volcol=volume_reported_spot_usd_1d"
  }
