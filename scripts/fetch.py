@@ -94,6 +94,20 @@ try:
             except Exception: v = None
         out.append([ts, c, v])
     json.dump({'fetched': NOW, 'cols': ['t', 'c', 'v'], 'rows': out}, open('price.json', 'w'), separators=(',', ':'))
+    # whale / exchange on-chain columns (whatever this CSV offers), all history
+    keys = ('FlowIn', 'FlowOut', 'Top100', 'Top10', 'Top1Pct', 'AdrBal', 'AdrActCnt', 'TxCnt', 'TxTfrValAdjUSD', 'SplyAdr', 'SplyExpFut10yr')
+    oc = [c for c in cols if any(k in c for k in keys)]
+    rows2 = []
+    rd2 = csv.DictReader(io.StringIO(raw))
+    for r in rd2:
+        ts = int(time.mktime(time.strptime(r['time'][:10], '%Y-%m-%d'))) - time.timezone
+        vals = []
+        for c2 in oc:
+            try: vals.append(float(r[c2]))
+            except Exception: vals.append(None)
+        if any(v is not None for v in vals): rows2.append([ts] + vals)
+    json.dump({'cols': ['t'] + oc, 'rows': rows2}, open('onchain.json', 'w'), separators=(',', ':'))
+    meta['status']['onchain'] = '%d cols: %s' % (len(oc), ','.join(oc))
     meta['status']['price'] = '%d rows, %s .. %s, volcol=%s' % (len(out), time.strftime('%Y-%m-%d', time.gmtime(out[0][0])), time.strftime('%Y-%m-%d', time.gmtime(out[-1][0])), volcol)
 except Exception as e:
     meta['status']['price'] = 'FAILED: %s' % e
