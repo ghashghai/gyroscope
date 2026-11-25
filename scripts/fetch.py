@@ -60,6 +60,18 @@ for fname, ep, extra in endpoints:
         meta['status'][ep] = 'FAILED: %s' % e
     time.sleep(3)
 
+
+# hourly candles + hourly liquidations (history accumulates in the repo)
+for fname, ep, extra in [('ohlcv1h.json', 'ohlcv-history', ''), ('liq1h.json', 'liquidation-history', '&convert_to_usd=true')]:
+    url = 'https://api.coinalyze.net/v1/%s?symbols=%s&interval=1hour&from=%d&to=%d%s&api_key=%s' % (ep, SYMS, NOW - 80 * 86400, NOW, extra, KEY)
+    try:
+        j = get(url)
+        assert isinstance(j, list) and j, 'empty'
+        meta['status'][fname] = merge_history(fname, j)
+    except Exception as e:
+        meta['status'][fname] = 'FAILED: %s' % e
+    time.sleep(3)
+
 # full BTC price history 2010..today: CoinMetrics community CSV (close only), served from GitHub
 try:
     import csv, io
