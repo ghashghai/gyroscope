@@ -263,6 +263,21 @@ function drawSim() {
   if (SIMMODE === 'analog' && elig.length < 50) SIMMODE = 'hist';
   for (let k = 0; k < NP; k++) { const q = [p0]; for (let b = 0; b < NB; b++) { const s0 = SIMMODE === 'analog' ? elig[Math.floor(rand() * elig.length)] : Math.floor(rand() * (r.length - BL)); for (let j = 0; j < BL; j++) q.push(q[q.length - 1] * Math.exp(r[s0 + j] - sub)); } paths.push(q); }
   const pct = (t, f) => { const a = paths.map((q) => q[t]).sort((x, y) => x - y); return a[Math.floor(f * (a.length - 1))]; };
+  // "روز ریزش": first day a path falls 30% from its own running peak; what the 150-day rule would have done
+  let outCnt = 0; const hist150 = c.slice(n - 150), crash = [], exitD = [], avoid = [], marks = new Array(NP).fill(-1);
+  for (let k = 0; k < NP; k++) {
+    const q = paths[k]; let pk = 0, tp = 0, tc = -1;
+    for (let t = 1; t <= H; t++) { if (q[t] > q[pk]) pk = t; if (q[t] <= q[pk] * 0.7) { tc = t; tp = pk; break; } }
+    if (tc < 0) continue; marks[k] = tc; crash.push(tc);
+    const all = hist150.concat(q.slice(1)); let sum = 0; const sm = [];
+    for (let i = 0; i < all.length; i++) { sum += all[i]; if (i >= 150) sum -= all[i - 150]; sm.push(i >= 149 ? sum / 150 : NaN); }
+    if (!(all[150 + tp - 1] > sm[150 + tp - 1])) { outCnt++; continue; }
+    let bot = tp, end = Math.min(H, tp + 120); for (let t = tp; t <= end; t++) if (q[t] < q[bot]) bot = t;
+    let ex = -1; for (let t = tp; t <= H; t++) { const i = 150 + t - 1; if (t > 0 && all[i] < sm[i]) { ex = t; break; } }
+    if (ex < 0 || ex > bot) { avoid.push(0); if (ex >= 0) exitD.push(ex - tp); continue; }
+    exitD.push(ex - tp); const fall = q[bot] / q[tp] - 1, taken = q[ex] / q[tp] - 1; avoid.push(Math.max(0, 1 - taken / fall));
+  }
+  const med = (a) => { if (!a.length) return NaN; const b = a.slice().sort((x, y) => x - y); return b[Math.floor((b.length - 1) / 2)]; };
   const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, Hh = cv.clientHeight;
   cv.width = W * dpr; cv.height = Hh * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
   const back = 365, i0 = n - 1 - back, L = 8, R = W - 8, T = 10, B = Hh - 20, tot = back + H;
@@ -270,14 +285,14 @@ function drawSim() {
   const X = (k) => L + (k / tot) * (R - L), Y = (p) => B - ((Math.log(p) - lo) / (hi - lo)) * (B - T);
   g.font = '10px sans-serif'; g.textAlign = 'left';
   for (const [lv, lab] of [[57356, '0.618 ← 57k'], [42000, 'محور تو: 42k'], [39068, '0.786 ← 39k']]) { g.setLineDash([4, 4]); g.strokeStyle = 'rgba(217,180,91,.6)'; g.lineWidth = 1; g.beginPath(); g.moveTo(L, Y(lv)); g.lineTo(R, Y(lv)); g.stroke(); g.setLineDash([]); g.fillStyle = 'rgba(217,180,91,.9)'; g.fillText(lab, L + 2, Y(lv) + (lv === 39068 ? 11 : -2)); }
-  g.lineWidth = 1; for (let k = 0; k < 10; k++) { const q = paths[k]; g.strokeStyle = 'hsla(' + (k * 36) + ',55%,62%,.55)'; g.beginPath(); for (let t = 0; t <= H; t++) { const x = X(back + t), y = Y(q[t]); t ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
+  g.lineWidth = 1; for (let k = 0; k < 10; k++) { const q = paths[k]; g.strokeStyle = 'hsla(' + (k * 36) + ',55%,62%,.55)'; g.beginPath(); for (let t = 0; t <= H; t++) { const x = X(back + t), y = Y(q[t]); t ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); if (marks[k] > 0) { g.fillStyle = '#e8645d'; g.beginPath(); g.arc(X(back + marks[k]), Y(q[marks[k]]), 3.5, 0, 6.3); g.fill(); } }
   g.fillStyle = 'rgba(235,232,223,.10)'; g.beginPath(); for (let t = 0; t <= H; t += 6) { const x = X(back + t), y = Y(pct(t, 0.9)); t ? g.lineTo(x, y) : g.moveTo(x, y); } for (let t = H; t >= 0; t -= 6) g.lineTo(X(back + t), Y(pct(t, 0.1))); g.closePath(); g.fill();
   g.strokeStyle = '#ebe8df'; g.lineWidth = 2; g.beginPath(); for (let t = 0; t <= H; t += 6) { const x = X(back + t), y = Y(pct(t, 0.5)); t ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
   g.strokeStyle = '#6b7390'; g.lineWidth = 1.8; g.beginPath(); for (let i = i0; i < n; i++) { const x = X(i - i0), y = Y(c[i]); i === i0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke();
   g.fillStyle = '#9ca3bb'; g.textAlign = 'center'; g.fillText('امروز', X(back), Hh - 6); g.fillText('+۱ سال', X(tot) - 14, Hh - 6);
   const end = paths.map((q) => q[H]), up = end.filter((v) => v > p0).length / NP, min = paths.map((q) => Math.min(...q));
   const f = (v) => Math.round(v / 1000) + 'k', pc = (x) => Math.round(x * 100) + '٪';
-  $('simtxt').innerHTML = 'یک سال بعد (۲۰۰۰ مسیر): ۱۰٪ بدترین ≈ <b>' + f(pct(H, 0.1)) + '</b>، میانه ≈ <b>' + f(pct(H, 0.5)) + '</b>، ۱۰٪ بهترین ≈ <b>' + f(pct(H, 0.9)) + '</b>.<br>احتمال بالاتر از امروز (' + f(p0) + '): ' + pc(up) + '. احتمال لمس ۴۲k در مسیر: ' + pc(min.filter((v) => v < 42000).length / NP) + '. احتمال لمس ۳۹k: ' + pc(min.filter((v) => v < 39068).length / NP) + '. احتمال رسیدن به ۱۵۰k در مسیر: ' + pc(paths.filter((q) => Math.max(...q) > 150000).length / NP) + '.';
+  $('simtxt').innerHTML = 'یک سال بعد (۲۰۰۰ مسیر): ۱۰٪ بدترین ≈ <b>' + f(pct(H, 0.1)) + '</b>، میانه ≈ <b>' + f(pct(H, 0.5)) + '</b>، ۱۰٪ بهترین ≈ <b>' + f(pct(H, 0.9)) + '</b>.<br>احتمال بالاتر از امروز (' + f(p0) + '): ' + pc(up) + '. احتمال لمس ۴۲k در مسیر: ' + pc(min.filter((v) => v < 42000).length / NP) + '. احتمال لمس ۳۹k: ' + pc(min.filter((v) => v < 39068).length / NP) + '. احتمال رسیدن به ۱۵۰k در مسیر: ' + pc(paths.filter((q) => Math.max(...q) > 150000).length / NP) + '.<br><b>روز ریزش</b> (نقطهٔ قرمز = اولین روزی که مسیر ۳۰٪ از سقف خودش افت می‌کند): در ' + pc(crash.length / NP) + ' مسیرها رخ می‌دهد؛ میانه‌اش ' + Math.round(med(crash)) + ' روز بعد از امروز. در ' + pc(outCnt / Math.max(1, crash.length)) + ' از این ریزش‌ها قانون از قبل بیرون بود (زیر میانگین)؛ در بقیه، قانون ۱۵۰ روزه میانه ' + Math.round(med(exitD)) + ' روز بعد از سقف خارج می‌شود و میانهٔ سهم سقوطی که در امان می‌ماند ' + pc(med(avoid)) + ' است.';
   $('sb1').style.background = SIMMODE === 'hist' ? 'var(--gold)' : 'var(--mut)'; $('sb2').style.background = SIMMODE === 'flat' ? 'var(--gold)' : 'var(--mut)'; $('sb3').style.background = SIMMODE === 'analog' ? 'var(--gold)' : 'var(--mut)'; if (SIMMODE === 'analog') $('simtxt').innerHTML += '<br><span class="mut">«شبیه امروز»: تکه‌ها فقط از روزهایی برداشته شده که مثل امروز زیر میانگین ۱۵۰ روزه بودند و بیش از ۲۰٪ از سقف ۹۰ روز افت داشتند (' + elig.length + ' روز).</span>';
 }
 
