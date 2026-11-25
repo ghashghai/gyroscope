@@ -95,7 +95,7 @@ try:
         out.append([ts, c, v])
     json.dump({'fetched': NOW, 'cols': ['t', 'c', 'v'], 'rows': out}, open('price.json', 'w'), separators=(',', ':'))
     # whale / exchange on-chain columns (whatever this CSV offers), all history
-    keys = ('FlowIn', 'FlowOut', 'Top100', 'Top10', 'Top1Pct', 'AdrBal', 'AdrActCnt', 'TxCnt', 'TxTfrValAdjUSD', 'SplyAdr', 'SplyExpFut10yr')
+    keys = ('CapMVRV', 'CapRealUSD', 'CapMrktCurUSD', 'SplyCur', 'FlowIn', 'FlowOut', 'Top100', 'Top10', 'Top1Pct', 'AdrBal', 'AdrActCnt', 'TxCnt', 'TxTfrValAdjUSD', 'SplyAdr', 'SplyExpFut10yr')
     oc = [c for c in cols if any(k in c for k in keys)]
     rows2 = []
     rd2 = csv.DictReader(io.StringIO(raw))
@@ -108,9 +108,30 @@ try:
         if any(v is not None for v in vals): rows2.append([ts] + vals)
     json.dump({'cols': ['t'] + oc, 'rows': rows2}, open('onchain.json', 'w'), separators=(',', ':'))
     meta['status']['onchain'] = '%d cols: %s' % (len(oc), ','.join(oc))
+    meta['status']['btc_all_cols'] = ','.join(cols)
     meta['status']['price'] = '%d rows, %s .. %s, volcol=%s' % (len(out), time.strftime('%Y-%m-%d', time.gmtime(out[0][0])), time.strftime('%Y-%m-%d', time.gmtime(out[-1][0])), volcol)
 except Exception as e:
     meta['status']['price'] = 'FAILED: %s' % e
+
+
+# stablecoin (USDT) on-chain series from CoinMetrics community CSVs
+for nm in ('usdt_eth', 'usdt_trx'):
+    try:
+        raw3 = urllib.request.urlopen(urllib.request.Request('https://raw.githubusercontent.com/coinmetrics/data/master/csv/%s.csv' % nm, headers={'User-Agent': 'gyroscope-radar'}), timeout=120).read().decode()
+        rd3 = csv.DictReader(io.StringIO(raw3))
+        c3 = [c for c in rd3.fieldnames if c != 'time' and any(k in c for k in ('SplyCur', 'FlowIn', 'FlowOut', 'AdrActCnt', 'TxCnt', 'TxTfrValAdjUSD', 'SplyExp'))]
+        rows3 = []
+        for r in rd3:
+            ts = int(time.mktime(time.strptime(r['time'][:10], '%Y-%m-%d'))) - time.timezone
+            vals = []
+            for c4 in c3:
+                try: vals.append(float(r[c4]))
+                except Exception: vals.append(None)
+            if any(v is not None for v in vals): rows3.append([ts] + vals)
+        json.dump({'cols': ['t'] + c3, 'rows': rows3}, open('%s.json' % nm, 'w'), separators=(',', ':'))
+        meta['status'][nm] = '%d rows, cols: %s | all: %s' % (len(rows3), ','.join(c3), ','.join(rd3.fieldnames))
+    except Exception as e:
+        meta['status'][nm] = 'FAILED: %s' % e
 
 json.dump(meta, open('meta.json', 'w'), indent=1)
 print(json.dumps(meta, indent=1))
