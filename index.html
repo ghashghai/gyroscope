@@ -174,6 +174,23 @@ function swingCard(S) {
     '<div class="card"><h2>قانون میانگین ۱۵۰ روزه در هر سقوط و صعود</h2><div class="tw"><table><tr><th>آغاز</th><th>حرکت</th><th>نتیجهٔ قانون</th></tr>' + rows.join('') + '</table></div>' +
     '<div style="margin-top:8px">از ' + avs.length + ' سقوط بیش از ۴۰٪ از سال ۲۰۱۳، میانهٔ سهم سقوطی که با قانون در امان ماند: ' + pct(med(avs)) + '. از ' + caps.length + ' صعودی که قانون واقعاً از بیرون وارد آن شد، میانهٔ سهم صعودی که گرفته شد: ' + pct(med(caps)) + '.</div><div class="mut" style="margin-top:6px">خروج یعنی نخستین روزی که قیمت از میانگین ۱۵۰ روزه پایین‌تر بسته شد. «در امان» یعنی چه بخشی از سقوط بعد از خروج رخ داد. کارمزد و لغزش قیمت را حساب نکرده‌ام.</div></div>';
 }
+function mvrvCard(S, oc) {
+  if (!oc) return '';
+  const ci = oc.cols.indexOf('CapMVRVCur'); if (ci < 0) return '';
+  let last = null; for (let k = oc.rows.length - 1; k >= 0; k--) if (oc.rows[k][ci] != null) { last = oc.rows[k]; break; }
+  if (!last) return '';
+  const day = Math.floor(last[0] / 86400), n = S.c.length; let ix = -1; for (let i = n - 1; i >= 0; i--) if (S.d[i] <= day) { ix = i; break; }
+  if (ix < 0) return '';
+  const mv = last[ci], rp = S.c[ix] / mv, est = S.c[n - 1] / rp, f = (x) => Math.round(x).toLocaleString('en-US');
+  const vd = est < 1 ? ['v-g', 'منطقهٔ کف تاریخی: بازار زیر قیمت خرید دارندگان'] : est < 1.5 ? ['v-y', 'نزدیک کف، ولی هنوز به زیر ۱ نرسیده'] : est < 3 ? ['v-y', 'میانه'] : ['v-r', 'منطقهٔ داغ (قله‌های قبلی بالای ۳)'];
+  return '<div class="card"><h2>ارزش: MVRV بیت‌کوین</h2>' +
+    '<div class="' + vd[0] + '" style="font-weight:700;font-size:18px">تخمین امروز ≈ ' + est.toFixed(2) + ' — ' + vd[1] + '</div>' +
+    '<div class="tw"><table><tr><th>آخرین مقدار واقعی</th><td>' + mv.toFixed(2) + ' در ' + dstr(last[0]) + '</td></tr>' +
+    '<tr><th>میانگین قیمت خرید دارندگان</th><td>≈ ' + f(rp) + ' دلار</td></tr>' +
+    '<tr><th>کف‌های ۲۰۱۵ تا ۲۰۲۲</th><td>۰٫۵۶ تا ۰٫۸۸ (همیشه زیر ۱)</td></tr>' +
+    '<tr><th>قله‌های ۲۰۱۳ تا ۲۰۲۱</th><td>۲٫۷ تا ۴٫۷</td></tr></table></div>' +
+    '<div class="mut" style="margin-top:6px">داده‌ی MVRV منبع رایگان است و فقط تا ' + dstr(last[0]) + ' آمده؛ عدد امروز تخمین است (قیمت امروز تقسیم بر میانگین قیمت خرید آن روز، که آهسته تغییر می‌کند). قیمت زیر ≈ ' + f(rp) + ' یعنی MVRV زیر ۱. در آزمون: وقتی MVRV زیر ۱ بود، ۱۸۰ روز بعد ۸۲٪ دفعات مثبت؛ ولی اگر فروش در MVRV بالای ۳ را به قانون روند اضافه کنیم، افت بدترین از ۶۳٪ به ۵۴٪ می‌رسد و رشد سالانه از ۶۶٪ به ۵۸٪ می‌افتد.</div></div>';
+}
 function drawCycle(dd, lowIn, rng) {
   const cv = $('cv2'); if (!cv || !window.__S) return;
   const S = window.__S, c = S.c, n = c.length;
@@ -275,7 +292,7 @@ async function run() {
   $('go').disabled = true; $('log').innerHTML = ''; $('out').innerHTML = '';
   try {
     const q = '?ts=' + Date.now();
-    const [meta, oh, liq, oi, fu, ls, price] = await Promise.all(['meta', 'ohlcv', 'liq', 'oi', 'funding', 'lsr', 'price'].map((f) => getJSON('./' + f + '.json' + q).catch((e) => { log('نیامد: ' + f, 'dn'); return null; })));
+    const [meta, oh, liq, oi, fu, ls, price, onch] = await Promise.all(['meta', 'ohlcv', 'liq', 'oi', 'funding', 'lsr', 'price', 'onchain'].map((f) => getJSON('./' + f + '.json' + q).catch((e) => { log('نیامد: ' + f, 'dn'); return null; })));
     if (!oh) throw new Error('داده قیمت هنوز در مخزن نیست');
     log('داده به‌روز شده: ' + new Date(meta.fetched * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC');
     const todayDay = Math.floor(Date.now() / 86400000);
@@ -294,7 +311,7 @@ async function run() {
       html += coinCard(coinState(sym, S, aux));
     }
     html += BACKTEST;
-    if (btc) html += swingCard(btc) + simCard();
+    if (btc) html += mvrvCard(btc, onch) + swingCard(btc) + simCard();
     $('out').innerHTML = html; drawSwing(); drawSim();
   } catch (e) { log('خطا: ' + e.message, 'dn'); }
   $('go').disabled = false;
