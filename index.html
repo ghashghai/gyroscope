@@ -153,7 +153,9 @@ function swingCard(S) {
     const a = p[k], b = p[k + 1], mv = c[b.i] / c[a.i] - 1, down = b.t === 'L';
     if (a.i < 200 || S.d[a.i] < 15706) continue;   // from 2013 on: the market was very thin before
     if (down && mv > -0.4) continue; if (!down && mv < 1.0) continue;
-    segs.push({ from: a.i, to: b.i, down });
+    let ty = '', t30 = -1;
+    if (down) { for (let i = a.i; i <= b.i; i++) if (c[i] <= c[a.i] * 0.7) { t30 = i - a.i; break; } ty = t30 <= 14 ? 'N' : t30 <= 60 ? 'M' : 'A'; }
+    segs.push({ from: a.i, to: b.i, down, ty, t30 });
     let txt;
     if (down) {
       let e = -1; for (let i = a.i + 1; i <= b.i; i++) if (c[i] < sma[i]) { e = i; break; }
@@ -165,11 +167,12 @@ function swingCard(S) {
       else if (e < 0) { txt = '—'; caps.push(0); }
       else { const cap = Math.log(c[b.i] / c[e]) / Math.log(c[b.i] / c[a.i]); caps.push(Math.max(0, cap)); txt = 'ورود ' + (e - a.i) + ' روز بعد؛ ' + pct(Math.max(0, cap)) + ' صعود (لگاریتمی) گرفته شد'; }
     }
-    rows.push('<tr><td>' + dstr(S.d[a.i] * 86400) + '</td><td class="' + (down ? 'dn' : 'up') + '">' + (down ? 'سقوط ' : 'صعود ') + pct(mv) + '</td><td style="text-align:right">' + txt + '</td></tr>');
+    rows.push('<tr><td>' + dstr(S.d[a.i] * 86400) + '</td><td class="' + (down ? 'dn' : 'up') + '">' + (down ? 'سقوط ' : 'صعود ') + pct(mv) + (down ? '<br><span class="mut">' + ({ N: 'ناگهانی', M: 'میانه', A: 'آرام' })[ty] + ': ' + t30 + ' روز تا ۳۰٪ افت</span>' : '') + '</td><td style="text-align:right">' + txt + '</td></tr>');
   }
   const med = (a) => { if (!a.length) return NaN; const b = a.slice().sort((x, y) => x - y); return b[Math.floor((b.length - 1) / 2)]; };
   window.__segs = segs; window.__S = S;
-  return '<div class="card"><h2>نقشهٔ بیت‌کوین از ' + dstr(S.d[0] * 86400) + '</h2><canvas id="cv"></canvas><div class="mut">قرمز = سقوط بیش از ۴۰٪، سبز = صعود بیش از ۱۰۰٪. مقیاس لگاریتمی.<br>نقطهٔ زرد = قلهٔ هر چرخه، خط‌چین عمودی = مرز چرخه.</div></div>' +
+  return '<div class="card"><h2>نقشهٔ بیت‌کوین از ' + dstr(S.d[0] * 86400) + '</h2><canvas id="cv"></canvas><div class="mut">قرمز = سقوط بیش از ۴۰٪، سبز = صعود بیش از ۱۰۰٪. مقیاس لگاریتمی.<br>نقطهٔ زرد = قلهٔ هر چرخه، خط‌چین عمودی = مرز چرخه.<br>نوع سقوط بر پایهٔ سرعت، نقطه روی هر قله: <b style="color:#ff3b30">قرمز = ناگهانی</b> (۳۰٪ افت در ۱۴ روز یا کمتر)، <b style="color:#ffb020">نارنجی = میانه</b> (۱۵ تا ۶۰ روز)، <b style="color:#4aa3ff">آبی = آرام</b> (بیش از ۶۰ روز).</div></div>' +
+    todayTypeCard(S) +
     '<div class="card"><h2>فیبوناچی چرخهٔ فعلی</h2><canvas id="cv2"></canvas><div class="mut">از کف ۲۰۲۲ تا قلهٔ ۲۰۲۵. فیبوناچی اینجا نقشه و نماد است، نه سیگنال خرید و فروش؛ در سه چرخهٔ قبل کف‌ها روی ۰٫۶۱۸ نایستادند.</div></div>' +
     '<div class="card"><h2>قانون میانگین ۱۵۰ روزه در هر سقوط و صعود</h2><div class="tw"><table><tr><th>آغاز</th><th>حرکت</th><th>نتیجهٔ قانون</th></tr>' + rows.join('') + '</table></div>' +
     '<div style="margin-top:8px">از ' + avs.length + ' سقوط بیش از ۴۰٪ از سال ۲۰۱۳، میانهٔ سهم سقوطی که با قانون در امان ماند: ' + pct(med(avs)) + '. از ' + caps.length + ' صعودی که قانون واقعاً از بیرون وارد آن شد، میانهٔ سهم صعودی که گرفته شد: ' + pct(med(caps)) + '.</div><div class="mut" style="margin-top:6px">خروج یعنی نخستین روزی که قیمت از میانگین ۱۵۰ روزه پایین‌تر بسته شد. «در امان» یعنی چه بخشی از سقوط بعد از خروج رخ داد. کارمزد و لغزش قیمت را حساب نکرده‌ام.</div></div>';
@@ -190,6 +193,17 @@ function mvrvCard(S, oc) {
     '<tr><th>کف‌های ۲۰۱۵ تا ۲۰۲۲</th><td>۰٫۵۶ تا ۰٫۸۸ (همیشه زیر ۱)</td></tr>' +
     '<tr><th>قله‌های ۲۰۱۳ تا ۲۰۲۱</th><td>۲٫۷ تا ۴٫۷</td></tr></table></div>' +
     '<div class="mut" style="margin-top:6px">داده‌ی MVRV منبع رایگان است و فقط تا ' + dstr(last[0]) + ' آمده؛ عدد امروز تخمین است (قیمت امروز تقسیم بر میانگین قیمت خرید آن روز، که آهسته تغییر می‌کند). قیمت زیر ≈ ' + f(rp) + ' یعنی MVRV زیر ۱. در آزمون: وقتی MVRV زیر ۱ بود، ۱۸۰ روز بعد ۸۲٪ دفعات مثبت؛ ولی اگر فروش در MVRV بالای ۳ را به قانون روند اضافه کنیم، افت بدترین از ۶۳٪ به ۵۴٪ می‌رسد و رشد سالانه از ۶۶٪ به ۵۸٪ می‌افتد.</div></div>';
+}
+function todayTypeCard(S) {
+  const c = S.c, n = c.length; let a = -1; for (let i = 0; i < n; i++) if (S.d[i] >= Date.UTC(2024, 0, 1) / 86400000 && (a < 0 || c[i] > c[a])) a = i;
+  if (a < 0) return '';
+  let t30 = -1; for (let i = a; i < n; i++) if (c[i] <= c[a] * 0.7) { t30 = i - a; break; }
+  const dd = c[n - 1] / c[a] - 1, ty = t30 < 0 ? '' : t30 <= 14 ? 'ناگهانی' : t30 <= 60 ? 'میانه' : 'آرام';
+  const cnt = { N: 0, M: 0, A: 0 }; for (const sg of window.__segs) if (sg.down) cnt[sg.ty]++;
+  return '<div class="card"><h2>سقوط امروز کدام نوع است؟</h2><div style="font-weight:700;font-size:18px">' + (ty ? 'نوع ' + ty + ': ' + t30 + ' روز بعد از قله به ۳۰٪ افت رسید' : 'هنوز به ۳۰٪ افت از قله نرسیده') + '</div>' +
+    '<div class="tw"><table><tr><th>قلهٔ این چرخه</th><td>' + dstr(S.d[a] * 86400) + '، ' + Math.round(c[a]).toLocaleString('en-US') + ' دلار</td></tr><tr><th>افت تا امروز</th><td>' + pct(dd) + ' در ' + (n - 1 - a) + ' روز</td></tr>' +
+    '<tr><th>۱۶ سقوط قبلی</th><td>ناگهانی ' + cnt.N + '، میانه ' + cnt.M + '، آرام ' + cnt.A + '</td></tr></table></div>' +
+    '<div class="mut" style="margin-top:6px">امروز سقوط از نوع «' + (ty || '—') + '» است و با بیشتر سقوط‌های قبلی هم‌شکل است. ولی کف سه چرخهٔ بزرگ قبلی ۷۷ تا ۸۵٪ پایین بود و این بار تا الان ' + pct(-dd) + ' است. نوع سقوط به‌تنهایی پیش‌بینی عمق نمی‌کند؛ این فقط یک برچسب برای مقایسه است.</div></div>';
 }
 function drawCycle(dd, lowIn, rng) {
   const cv = $('cv2'); if (!cv || !window.__S) return;
@@ -239,6 +253,7 @@ function drawSwing() {
   g.setLineDash([]); g.fillStyle = '#d9b45b';
   for (const i of peaks) { g.beginPath(); g.arc(X(i), Y(c[i]), 3.5, 0, 6.3); g.fill(); }
   drawCycle(dd, lowIn, rng);
+  for (const sg of segs) if (sg.down) { g.fillStyle = sg.ty === 'N' ? '#ff3b30' : sg.ty === 'M' ? '#ffb020' : '#4aa3ff'; g.strokeStyle = '#0d1020'; g.lineWidth = 1.5; g.beginPath(); g.arc(X(sg.from), Y(c[sg.from]), 5, 0, 6.3); g.fill(); g.stroke(); }
   g.fillStyle = '#9ca3bb'; g.font = '11px sans-serif'; g.textAlign = 'center';
   let ly = -1; for (let i = 0; i < n; i++) { const y = new Date(S.d[i] * 86400000).getUTCFullYear(); if (y !== ly) { ly = y; if (y % 2 === 0) g.fillText(String(y), X(i), H - 6); } }
 }
