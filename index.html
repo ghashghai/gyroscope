@@ -161,7 +161,8 @@ function swingCard(S) {
       else { const lossTaken = c[e] / c[a.i] - 1, avoided = 1 - lossTaken / mv; avs.push(Math.max(0, avoided)); txt = 'خروج ' + (e - a.i) + ' روز بعد، در افت ' + pct(lossTaken) + '؛ ' + pct(Math.max(0, avoided)) + ' سقوط در امان'; }
     } else {
       let e = -1; for (let i = a.i; i <= b.i; i++) if (c[i] > sma[i]) { e = i; break; }
-      if (e < 0) { txt = '—'; caps.push(0); }
+      if (c[a.i] > sma[a.i]) { txt = 'قانون از قبل داخل بود (این فقط یک اصلاح میانهٔ روند صعودی بود، ورود تازه نبود)'; }
+      else if (e < 0) { txt = '—'; caps.push(0); }
       else { const cap = Math.log(c[b.i] / c[e]) / Math.log(c[b.i] / c[a.i]); caps.push(Math.max(0, cap)); txt = 'ورود ' + (e - a.i) + ' روز بعد؛ ' + pct(Math.max(0, cap)) + ' صعود (لگاریتمی) گرفته شد'; }
     }
     rows.push('<tr><td>' + dstr(S.d[a.i] * 86400) + '</td><td class="' + (down ? 'dn' : 'up') + '">' + (down ? 'سقوط ' : 'صعود ') + pct(mv) + '</td><td style="text-align:right">' + txt + '</td></tr>');
@@ -171,7 +172,7 @@ function swingCard(S) {
   return '<div class="card"><h2>نقشهٔ بیت‌کوین از ' + dstr(S.d[0] * 86400) + '</h2><canvas id="cv"></canvas><div class="mut">قرمز = سقوط بیش از ۴۰٪، سبز = صعود بیش از ۱۰۰٪. مقیاس لگاریتمی.<br>نقطهٔ زرد = قلهٔ هر چرخه، خط‌چین عمودی = مرز چرخه.</div></div>' +
     '<div class="card"><h2>فیبوناچی چرخهٔ فعلی</h2><canvas id="cv2"></canvas><div class="mut">از کف ۲۰۲۲ تا قلهٔ ۲۰۲۵. فیبوناچی اینجا نقشه و نماد است، نه سیگنال خرید و فروش؛ در سه چرخهٔ قبل کف‌ها روی ۰٫۶۱۸ نایستادند.</div></div>' +
     '<div class="card"><h2>قانون میانگین ۱۵۰ روزه در هر سقوط و صعود</h2><div class="tw"><table><tr><th>آغاز</th><th>حرکت</th><th>نتیجهٔ قانون</th></tr>' + rows.join('') + '</table></div>' +
-    '<div style="margin-top:8px">از ' + avs.length + ' سقوط بیش از ۴۰٪ از سال ۲۰۱۳، میانهٔ سهم سقوطی که با قانون در امان ماند: ' + pct(med(avs)) + '. از ' + caps.length + ' صعود بیش از ۱۰۰٪، میانهٔ سهم صعودی که گرفته شد: ' + pct(med(caps)) + '.</div><div class="mut" style="margin-top:6px">خروج یعنی نخستین روزی که قیمت از میانگین ۱۵۰ روزه پایین‌تر بسته شد. «در امان» یعنی چه بخشی از سقوط بعد از خروج رخ داد. کارمزد و لغزش قیمت را حساب نکرده‌ام.</div></div>';
+    '<div style="margin-top:8px">از ' + avs.length + ' سقوط بیش از ۴۰٪ از سال ۲۰۱۳، میانهٔ سهم سقوطی که با قانون در امان ماند: ' + pct(med(avs)) + '. از ' + caps.length + ' صعودی که قانون واقعاً از بیرون وارد آن شد، میانهٔ سهم صعودی که گرفته شد: ' + pct(med(caps)) + '.</div><div class="mut" style="margin-top:6px">خروج یعنی نخستین روزی که قیمت از میانگین ۱۵۰ روزه پایین‌تر بسته شد. «در امان» یعنی چه بخشی از سقوط بعد از خروج رخ داد. کارمزد و لغزش قیمت را حساب نکرده‌ام.</div></div>';
 }
 function drawCycle(dd, lowIn, rng) {
   const cv = $('cv2'); if (!cv || !window.__S) return;
@@ -225,6 +226,41 @@ function drawSwing() {
   let ly = -1; for (let i = 0; i < n; i++) { const y = new Date(S.d[i] * 86400000).getUTCFullYear(); if (y !== ly) { ly = y; if (y % 2 === 0) g.fillText(String(y), X(i), H - 6); } }
 }
 
+
+let SIMMODE = 'hist';
+function rnd(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function simCard() {
+  return '<div class="card"><h2>مسیرهای فرضی یک سال آینده</h2><div style="margin:6px 0"><button id="sb1" onclick="setSim(\'hist\')">با روند تاریخی</button> <button id="sb2" onclick="setSim(\'flat\')" style="background:var(--mut)">بدون روند (خنثی)</button></div><canvas id="cv3" style="height:260px"></canvas><div id="simtxt" style="margin-top:8px"></div>' +
+    '<div class="mut" style="margin-top:6px">هر مسیر از ۱۰ تکه ۳۶ روزه ساخته شده که تصادفی از خود نمودار بیت‌کوین (از ۲۰۱۵) برداشته‌ام. این حدس‌های ممکن‌اند، نه پیش‌بینی. «با روند تاریخی» خوش‌بینانه است، چون بیت‌کوین در این سال‌ها خیلی بالا رفته؛ «خنثی» روند میانگین را برمی‌دارد و فقط شکل نوسان و شکاف‌ها را نگه می‌دارد.</div></div>';
+}
+function setSim(m) { SIMMODE = m; drawSim(); }
+function drawSim() {
+  const cv = $('cv3'); if (!cv || !window.__S) return;
+  const S = window.__S, c = S.c, n = c.length, p0 = c[n - 1];
+  let st = 0; for (let i = 0; i < n; i++) if (S.d[i] >= Date.UTC(2015, 0, 1) / 86400000) { st = i; break; }
+  const r = []; for (let i = st + 1; i < n; i++) r.push(Math.log(c[i] / c[i - 1]));
+  const mu = r.reduce((a, b) => a + b, 0) / r.length, sub = SIMMODE === 'flat' ? mu : 0;
+  const BL = 36, NB = 10, H = BL * NB, rand = rnd(Math.floor(Date.now() / 86400000) + 7), NP = 2000, paths = [];
+  for (let k = 0; k < NP; k++) { const q = [p0]; for (let b = 0; b < NB; b++) { const s0 = Math.floor(rand() * (r.length - BL)); for (let j = 0; j < BL; j++) q.push(q[q.length - 1] * Math.exp(r[s0 + j] - sub)); } paths.push(q); }
+  const pct = (t, f) => { const a = paths.map((q) => q[t]).sort((x, y) => x - y); return a[Math.floor(f * (a.length - 1))]; };
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, Hh = cv.clientHeight;
+  cv.width = W * dpr; cv.height = Hh * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  const back = 365, i0 = n - 1 - back, L = 8, R = W - 8, T = 10, B = Hh - 20, tot = back + H;
+  const lo = Math.log(Math.min(25000, pct(H, 0.03), Math.min(...c.slice(i0)))), hi = Math.log(Math.max(130000, pct(H, 0.97)));
+  const X = (k) => L + (k / tot) * (R - L), Y = (p) => B - ((Math.log(p) - lo) / (hi - lo)) * (B - T);
+  g.font = '10px sans-serif'; g.textAlign = 'left';
+  for (const [lv, lab] of [[57356, '0.618 ← 57k'], [42000, 'محور تو: 42k'], [39068, '0.786 ← 39k']]) { g.setLineDash([4, 4]); g.strokeStyle = 'rgba(217,180,91,.6)'; g.lineWidth = 1; g.beginPath(); g.moveTo(L, Y(lv)); g.lineTo(R, Y(lv)); g.stroke(); g.setLineDash([]); g.fillStyle = 'rgba(217,180,91,.9)'; g.fillText(lab, L + 2, Y(lv) + (lv === 39068 ? 11 : -2)); }
+  g.lineWidth = 1; for (let k = 0; k < 10; k++) { const q = paths[k]; g.strokeStyle = 'hsla(' + (k * 36) + ',55%,62%,.55)'; g.beginPath(); for (let t = 0; t <= H; t++) { const x = X(back + t), y = Y(q[t]); t ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
+  g.fillStyle = 'rgba(235,232,223,.10)'; g.beginPath(); for (let t = 0; t <= H; t += 6) { const x = X(back + t), y = Y(pct(t, 0.9)); t ? g.lineTo(x, y) : g.moveTo(x, y); } for (let t = H; t >= 0; t -= 6) g.lineTo(X(back + t), Y(pct(t, 0.1))); g.closePath(); g.fill();
+  g.strokeStyle = '#ebe8df'; g.lineWidth = 2; g.beginPath(); for (let t = 0; t <= H; t += 6) { const x = X(back + t), y = Y(pct(t, 0.5)); t ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+  g.strokeStyle = '#6b7390'; g.lineWidth = 1.8; g.beginPath(); for (let i = i0; i < n; i++) { const x = X(i - i0), y = Y(c[i]); i === i0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke();
+  g.fillStyle = '#9ca3bb'; g.textAlign = 'center'; g.fillText('امروز', X(back), Hh - 6); g.fillText('+۱ سال', X(tot) - 14, Hh - 6);
+  const end = paths.map((q) => q[H]), up = end.filter((v) => v > p0).length / NP, min = paths.map((q) => Math.min(...q));
+  const f = (v) => Math.round(v / 1000) + 'k', pc = (x) => Math.round(x * 100) + '٪';
+  $('simtxt').innerHTML = 'یک سال بعد (۲۰۰۰ مسیر): ۱۰٪ بدترین ≈ <b>' + f(pct(H, 0.1)) + '</b>، میانه ≈ <b>' + f(pct(H, 0.5)) + '</b>، ۱۰٪ بهترین ≈ <b>' + f(pct(H, 0.9)) + '</b>.<br>احتمال بالاتر از امروز (' + f(p0) + '): ' + pc(up) + '. احتمال لمس ۴۲k در مسیر: ' + pc(min.filter((v) => v < 42000).length / NP) + '. احتمال لمس ۳۹k: ' + pc(min.filter((v) => v < 39068).length / NP) + '. احتمال رسیدن به ۱۵۰k در مسیر: ' + pc(paths.filter((q) => Math.max(...q) > 150000).length / NP) + '.';
+  $('sb1').style.background = SIMMODE === 'hist' ? 'var(--gold)' : 'var(--mut)'; $('sb2').style.background = SIMMODE === 'flat' ? 'var(--gold)' : 'var(--mut)';
+}
+
 const BACKTEST = '<div class="card"><h2>آزمون واقعی: این قاعده‌ها چه کردند؟</h2>' +
   '<div class="tw"><table><tr><th>بیت‌کوین ۲۰۱۴-۰۶ تا ۲۰۲۶-۱۱</th><th>رشد سالانه</th><th>بدترین افت</th></tr>' +
   '<tr><td>نگه‌داشتن</td><td>۴۴٪</td><td class="dn">‎−۸۴٪</td></tr>' +
@@ -258,8 +294,8 @@ async function run() {
       html += coinCard(coinState(sym, S, aux));
     }
     html += BACKTEST;
-    if (btc) html += swingCard(btc);
-    $('out').innerHTML = html; drawSwing();
+    if (btc) html += swingCard(btc) + simCard();
+    $('out').innerHTML = html; drawSwing(); drawSim();
   } catch (e) { log('خطا: ' + e.message, 'dn'); }
   $('go').disabled = false;
 }
