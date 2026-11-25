@@ -172,7 +172,7 @@ function swingCard(S) {
   const med = (a) => { if (!a.length) return NaN; const b = a.slice().sort((x, y) => x - y); return b[Math.floor((b.length - 1) / 2)]; };
   window.__segs = segs; window.__S = S;
   return '<div class="card"><h2>نقشهٔ بیت‌کوین از ' + dstr(S.d[0] * 86400) + '</h2><canvas id="cv"></canvas><div class="mut">قرمز = سقوط بیش از ۴۰٪، سبز = صعود بیش از ۱۰۰٪. مقیاس لگاریتمی.<br>نقطهٔ زرد = قلهٔ هر چرخه، خط‌چین عمودی = مرز چرخه.<br>نوع سقوط بر پایهٔ سرعت، نقطه روی هر قله: <b style="color:#ff3b30">قرمز = ناگهانی</b> (۳۰٪ افت در ۱۴ روز یا کمتر)، <b style="color:#ffb020">نارنجی = میانه</b> (۱۵ تا ۶۰ روز)، <b style="color:#4aa3ff">آبی = آرام</b> (بیش از ۶۰ روز).</div></div>' +
-    todayTypeCard(S) +
+    todayTypeCard(S) + parabolaCard(S) +
     '<div class="card"><h2>فیبوناچی چرخهٔ فعلی</h2><canvas id="cv2"></canvas><div class="mut">از کف ۲۰۲۲ تا قلهٔ ۲۰۲۵. فیبوناچی اینجا نقشه و نماد است، نه سیگنال خرید و فروش؛ در سه چرخهٔ قبل کف‌ها روی ۰٫۶۱۸ نایستادند.</div></div>' +
     '<div class="card"><h2>قانون میانگین ۱۵۰ روزه در هر سقوط و صعود</h2><div class="tw"><table><tr><th>آغاز</th><th>حرکت</th><th>نتیجهٔ قانون</th></tr>' + rows.join('') + '</table></div>' +
     '<div style="margin-top:8px">از ' + avs.length + ' سقوط بیش از ۴۰٪ از سال ۲۰۱۳، میانهٔ سهم سقوطی که با قانون در امان ماند: ' + pct(med(avs)) + '. از ' + caps.length + ' صعودی که قانون واقعاً از بیرون وارد آن شد، میانهٔ سهم صعودی که گرفته شد: ' + pct(med(caps)) + '.</div><div class="mut" style="margin-top:6px">خروج یعنی نخستین روزی که قیمت از میانگین ۱۵۰ روزه پایین‌تر بسته شد. «در امان» یعنی چه بخشی از سقوط بعد از خروج رخ داد. کارمزد و لغزش قیمت را حساب نکرده‌ام.</div></div>';
@@ -204,6 +204,16 @@ function todayTypeCard(S) {
     '<div class="tw"><table><tr><th>قلهٔ این چرخه</th><td>' + dstr(S.d[a] * 86400) + '، ' + Math.round(c[a]).toLocaleString('en-US') + ' دلار</td></tr><tr><th>افت تا امروز</th><td>' + pct(dd) + ' در ' + (n - 1 - a) + ' روز</td></tr>' +
     '<tr><th>۱۶ سقوط قبلی</th><td>ناگهانی ' + cnt.N + '، میانه ' + cnt.M + '، آرام ' + cnt.A + '</td></tr></table></div>' +
     '<div class="mut" style="margin-top:6px">امروز سقوط از نوع «' + (ty || '—') + '» است و با بیشتر سقوط‌های قبلی هم‌شکل است. ولی کف سه چرخهٔ بزرگ قبلی ۷۷ تا ۸۵٪ پایین بود و این بار تا الان ' + pct(-dd) + ' است. نوع سقوط به‌تنهایی پیش‌بینی عمق نمی‌کند؛ این فقط یک برچسب برای مقایسه است.</div></div>';
+}
+function parabolaCard(S) {
+  const c = S.c, n = c.length, sm = smaArr(c, 150), rr = c.map((x, i) => (i ? Math.log(x / c[i - 1]) : NaN)), vs = stdRoll(rr, 30);
+  if (!vs) return '';
+  const dist = c[n - 1] / sm[n - 1] - 1; let lo = 0, tot = 0; const vv = vs[n - 1];
+  for (let i = 200; i < n; i++) if (isFinite(vs[i])) { tot++; if (vs[i] < vv) lo++; }
+  const vp = tot ? lo / tot : NaN, on = dist > 1 && vp > 0.85, f = (x) => (x * 100).toFixed(0) + '٪';
+  return '<div class="card"><h2>هشدار شتاب (پیش از سقوط ناگهانی)</h2><div class="' + (on ? 'v-r' : 'v-g') + '" style="font-weight:700;font-size:18px">' + (on ? 'روشن: بازار پرشتاب و پرنوسان است' : 'خاموش: امروز نشانهٔ شتاب بالا نیست') + '</div>' +
+    '<div class="tw"><table><tr><th>فاصله از میانگین ۱۵۰ روزه</th><td>' + f(dist) + ' (شرط روشن شدن: بیش از ۱۰۰٪)</td></tr><tr><th>رتبهٔ نوسان ۳۰ روزه در تاریخ</th><td>' + f(vp) + ' (شرط: بیش از ۸۵٪)</td></tr></table></div>' +
+    '<div class="mut" style="margin-top:6px">چهار سقوط ناگهانی تاریخ (۲۰۱۳ دو بار، ۲۰۱۸ دو بار) بعد از جهش شدید بودند: میانهٔ فاصله از میانگین ۱۱۸٪ و رتبهٔ نوسان ۹۰٪. وقتی هر دو شرط با هم روشن بودند، در ۷۱٪ مواقع ظرف ۳۰ روز بیش از ۲۰٪ افت آمد (حالت عادی ۱۵٪). ولی این فقط ۳ دوره (۳۵ روز) از ۲۰۱۵ به بعد بود، پس فرضیه است نه قانون.</div></div>';
 }
 function drawCycle(dd, lowIn, rng) {
   const cv = $('cv2'); if (!cv || !window.__S) return;
