@@ -48,6 +48,7 @@ endpoints = [
     ('oi.json', 'open-interest-history', '&convert_to_usd=true'),
     ('funding.json', 'funding-rate-history', ''),
     ('lsr.json', 'long-short-ratio-history', ''),
+    ('ohlcv.json', 'ohlcv-history', ''),
 ]
 for fname, ep, extra in endpoints:
     url = 'https://api.coinalyze.net/v1/%s?symbols=%s&interval=daily&from=1262304000&to=%d%s&api_key=%s' % (ep, SYMS, NOW, extra, KEY)
@@ -59,13 +60,29 @@ for fname, ep, extra in endpoints:
         meta['status'][ep] = 'FAILED: %s' % e
     time.sleep(3)
 
-# full BTC price history (CryptoCompare allData)
+# full BTC price history 2010..today: CoinMetrics community CSV (close only), served from GitHub
 try:
-    j = get('https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&allData=true')
-    rows = j['Data']['Data']
-    out = [[r['time'], r['high'], r['low'], r['close'], r['volumeto']] for r in rows if r.get('close', 0) > 0]
-    json.dump({'fetched': NOW, 'cols': ['t', 'h', 'l', 'c', 'v'], 'rows': out}, open('price.json', 'w'), separators=(',', ':'))
-    meta['status']['price'] = '%d rows, %s .. %s' % (len(out), time.strftime('%Y-%m-%d', time.gmtime(out[0][0])), time.strftime('%Y-%m-%d', time.gmtime(out[-1][0])))
+    import csv, io
+    raw = urllib.request.urlopen(urllib.request.Request('https://raw.githubusercontent.com/coinmetrics/data/master/csv/btc.csv', headers={'User-Agent': 'gyroscope-radar'}), timeout=120).read().decode()
+    rd = csv.DictReader(io.StringIO(raw))
+    cols = rd.fieldnames
+    volcol = next((c for c in cols if 'volume_reported_spot_usd_1d' in c), None)
+    out = []
+    for r in rd:
+        try:
+            c = float(r['PriceUSD'])
+        except Exception:
+            continue
+        if c <= 0:
+            continue
+        ts = int(time.mktime(time.strptime(r['time'][:10], '%Y-%m-%d'))) - time.timezone
+        v = None
+        if volcol and r.get(volcol):
+            try: v = float(r[volcol])
+            except Exception: v = None
+        out.append([ts, c, v])
+    json.dump({'fetched': NOW, 'cols': ['t', 'c', 'v'], 'rows': out}, open('price.json', 'w'), separators=(',', ':'))
+    meta['status']['price'] = '%d rows, %s .. %s, volcol=%s' % (len(out), time.strftime('%Y-%m-%d', time.gmtime(out[0][0])), time.strftime('%Y-%m-%d', time.gmtime(out[-1][0])), volcol)
 except Exception as e:
     meta['status']['price'] = 'FAILED: %s' % e
 
