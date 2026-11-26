@@ -386,7 +386,7 @@ function radarCard(SM, aux, oh1, lq1, macro, ohD, meta) {
   }
   if (!(WA && WA.length)) {
     if (TG && TG.length) { const e = TG[TG.length - 1][1], c30 = chg(TG, 30); liq.push({ n: 'حساب خزانهٔ آمریکا (TGA؛ هرچه بالاتر، پول بیشتر از بازار کشیده)', v: Math.round(e) + ' میلیارد$', c30, c90: chg(TG, 90), s: c30 >= .1 ? -1 : c30 <= -.1 ? 1 : 0, age: age(TG), note: 'قاعدهٔ کلاسیک؛ آزموده نشده' }); }
-    if (RR && RR.length) { const e = RR[RR.length - 1][1], c30 = chg(RR, 30); liq.push({ n: 'ریپوی معکوس فدرال (RRP؛ افت = پولِ پارک‌شده به بازار برمی‌گردد)', v: Math.round(e) + ' میلیارد$', c30, c90: chg(RR, 90), s: c30 <= -.1 ? 1 : c30 >= .1 ? -1 : 0, age: age(RR), note: 'قاعدهٔ کلاسیک؛ آزموده نشده' }); }
+    if (RR && RR.length) { const e = RR[RR.length - 1][1], c30 = chg(RR, 30); liq.push({ n: 'ریپوی معکوس فدرال (RRP؛ افت = پولِ پارک‌شده به بازار برمی‌گردد)', v: e.toFixed(1) + ' میلیارد$' + (e < 20 ? ' (تقریباً خالی؛ تغییر درصدی بی‌معناست)' : ''), c30, c90: chg(RR, 90), s: e < 20 ? 0 : c30 <= -.1 ? 1 : c30 >= .1 ? -1 : 0, age: age(RR), note: 'قاعدهٔ کلاسیک؛ آزموده نشده' }); }
   }
   const DX = MS.dollar_broad; if (DX && DX.length) { const c30 = chg(DX, 30); liq.push({ n: 'شاخص دلار (گسترده)', v: DX[DX.length - 1][1].toFixed(1), c30, c90: chg(DX, 90), s: c30 >= .01 ? -1 : c30 <= -.01 ? 1 : 0, age: age(DX), note: 'دلار قوی‌تر = فشار بر دارایی ریسکی (قاعدهٔ کلاسیک؛ اینجا آزموده نشده)' }); }
   const Y10 = MS.us10y; if (Y10 && Y10.length) { const e = Y10[Y10.length - 1][1], a = valAt(Y10, dAgo(Y10[Y10.length - 1][0], 30)); liq.push({ n: 'بازده اوراق ۱۰ ساله آمریکا', v: e.toFixed(2) + '٪', c30: a != null ? (e - a) / 100 : NaN, c90: NaN, s: a != null ? (e - a >= .25 ? -1 : e - a <= -.25 ? 1 : 0) : 0, age: age(Y10), note: 'افزایش بازده = فشار بر دارایی ریسکی (قاعدهٔ کلاسیک؛ آزموده نشده)', abs: true }); }
@@ -415,19 +415,95 @@ function radarCard(SM, aux, oh1, lq1, macro, ohD, meta) {
   // ----- متن رادار -----
   const B = T.BTC, txt = [];
   if (B) txt.push('BTC ' + B.reg[0] + ' است و ' + (B.a150 ? 'بالای' : 'زیر') + ' میانگین ۱۵۰ روزه؛ ' + (B.a21 ? 'بالای' : 'زیر') + ' میانگین ۲۱ روزه از ' + B.cross + ' روز پیش. ' + (!B.a150 && B.a21 ? 'این یعنی بازار دارد تلاش می‌کند روند را عوض کند، ولی تا بسته‌شدن بالای ۱۵۰ روزه تأییدی نیست. ' : B.a150 || B.a21 ? '' : 'هنوز نشانه‌ای از تغییر روند نیست. '));
-  const stab = liq.find((x) => x.n.startsWith('استیبل')); if (stab) txt.push('نقدینگی استیبل‌کوین‌ها در ۳۰ روز ' + fx(stab.c30) + ' ' + (stab.s < 0 ? '(خروج پول از بازار)' : stab.s > 0 ? '(ورود پول تازه)' : '(تقریباً ثابت)') + '.');
+  const stab = liq.find((x) => x.n.startsWith('استیبل')); if (stab) txt.push('نقدینگی استیبل‌کوین‌ها در ۳۰ روز ' + fx(stab.c30) + ' ' + (stab.s < 0 ? '(پول دارد از بازار بیرون می‌رود؛ به نفع ریزش)' : stab.s > 0 ? '(پول تازه وارد می‌شود؛ به نفع صعود)' : '(تقریباً ثابت)') + '.');
   if (P.BTC) txt.push('در ۲۴ ساعت گذشته BTC ' + fx(P.BTC.h24) + ' و ' + (P.BTC.ll > P.BTC.ls ? 'فشار لیکویید بیشتر روی لانگ‌ها' : 'فشار لیکویید بیشتر روی شورت‌ها') + ' بود.');
-  txt.push('از ' + bal.length + ' عامل: ' + up + ' حامی، ' + dn + ' فشار، ' + ne + ' خنثی.');
+  txt.push('از ' + bal.length + ' عامل: ' + up + ' به نفع صعود، ' + dn + ' به نفع ریزش، ' + ne + ' خنثی.');
   const stamp = lastHour ? new Date(lastHour * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : '—';
   return '<div class="card"><h2>رادار — بیلان ساعتی</h2>' +
     '<div class="verdict ' + (dn > up + 1 ? 'v-r' : up > dn + 1 ? 'v-g' : 'v-y') + '">' + txt.join(' ') + '</div>' +
     '<div class="mut" style="margin-top:4px">آخرین ساعتِ بسته‌شده: ' + stamp + ' · داده هر ساعت از مخزن تازه می‌شود (صفحه هر ۱۵ دقیقه دوباره می‌خواند).</div>' +
-    '<h3 style="margin:10px 0 4px">بیلان عامل‌ها</h3><div class="tw"><table><tr><th>عامل</th><th></th><th>وضعیت</th><th>اعتبار</th></tr>' + balRows + '</table></div>' +
+    '<h3 style="margin:10px 0 4px">بیلان عامل‌ها</h3><div class="tw"><table><tr><th>عامل</th><th>▲ صعود / ▼ ریزش</th><th>وضعیت</th><th>اعتبار</th></tr>' + balRows + '</table></div>' +
     '<h3 style="margin:10px 0 4px">پالس ساعتی</h3><div class="tw"><table><tr><th>ارز</th><th>قیمت</th><th>۱ ساعت</th><th>۲۴ ساعت</th><th>۷ روز</th><th>لیکوید ۲۴س لانگ/شورت</th><th>خرید تهاجمی</th><th>نوسان نسبت به معمول</th></tr>' + pulse + '</table></div>' +
     '<h3 style="margin:10px 0 4px">روند و تغییر روند</h3><div class="tw"><table><tr><th>ارز</th><th>رژیم</th><th>فاصله از ۱۵۰</th><th>نسبت به ۲۱ روزه</th><th>شیب ۲۱ روزه (۵ روز)</th><th>ساختار</th></tr>' + trend + '</table></div>' +
     '<h3 style="margin:10px 0 4px">نقدینگی</h3>' + (liqHtml ? '<div class="tw"><table><tr><th>شاخص</th><th>اکنون</th><th>۳۰ روز</th><th>۹۰ روز</th><th></th><th>تازگی</th></tr>' + liqHtml + '</table></div>' : '') +
     (fredMissing ? '<div class="mut" style="margin-top:4px">ترازنامهٔ کل فدرال (برای «نقدینگی خالص») از منبع رایگانش نیامد؛ به‌جایش دو جزء آن، TGA و RRP، جدا نشان داده می‌شوند. عدد ساختگی نمی‌گذارم.</div>' : '') +
     '<div class="mut" style="margin-top:8px"><b>صادقانه:</b> فقط عامل‌های «آزموده ✔» در گذشتهٔ BTC سنجیده شده‌اند (و آستانه‌هایشان درون‌نمونه‌ای است)؛ نقدینگی کلان و دلار قاعدهٔ کلاسیکند و اینجا هنوز آزموده نشده‌اند. این بیلان وضعیت را می‌خواند، سفارش نمی‌دهد؛ تصمیم‌گیر همچنان «فرمان» است.</div></div>';
+}
+// ---------- نقشهٔ روند: کدام تایم‌فریم ریزشی است + سطح خطر + خط روند ماهانه ----------
+const TM = { monthly: null };
+function trendMapCard(SM, aux, oh1, sirenSt) {
+  const now = Math.floor(Date.now() / 1000), up = '▲', dn = '▼', mx = '■';
+  const colr = (d) => (d > 0 ? '#5fe0a0' : d < 0 ? '#ff6b6b' : '#e0c060');
+  const word = (d) => (d > 0 ? 'صعودی' : d < 0 ? 'ریزشی' : 'خنثی/مخلوط');
+  const sma = (a, k, off) => { off = off || 0; let s = 0; for (let i = a.length - k - off; i < a.length - off; i++) s += a[i]; return s / k; };
+  const dirOf = (a, k, back, band) => { if (a.length < k + 1) return null; const p = a[a.length - 1], m = sma(a, k), d = p / m - 1, b = band || 0.01; return d > b ? 1 : d < -b ? -1 : 0; };
+  const hcl = (sym) => { const s = ((oh1 && oh1.data) || []).find((x) => String(x.symbol).startsWith(sym + 'USDT')); return s ? s.history.filter((x) => x.t + 3600 <= now).map((x) => x.c) : []; };
+  const logreg = (ys) => { const n = ys.length, xs = ys.map((_, i) => i), mx_ = (n - 1) / 2, my = ys.reduce((a, b) => a + b, 0) / n; let sxy = 0, sxx = 0; for (let i = 0; i < n; i++) { sxy += (xs[i] - mx_) * (ys[i] - my); sxx += (xs[i] - mx_) * (xs[i] - mx_); } const b = sxy / sxx, a = my - b * mx_; let ss = 0; for (let i = 0; i < n; i++) { const e = ys[i] - (a + b * xs[i]); ss += e * e; } return { a, b, sd: Math.sqrt(ss / (n - 2)) }; };
+  const TFS = [['۲۴ ساعت', 'h24'], ['۷ روز', 'h168'], ['۳ هفته', 'd21'], ['۵ ماه', 'd150'], ['۱ سال', 'd365'], ['خط ماهانه ۲ ساله', 'mon'], ['خط ماهانه ۵ ساله', 'mon60']];
+  let rows = '', btc = null;
+  for (const sym of COINS) {
+    const S = SM[sym]; if (!S || S.c.length < 200) continue;
+    const H = hcl(sym), Hc = H.length > 200 ? H : null, c = S.c, r = {};
+    r.h24 = Hc ? dirOf(Hc, 24, 6, 0.004) : null; r.h168 = Hc && Hc.length > 175 ? dirOf(Hc, 168, 24, 0.008) : null;
+    r.d21 = dirOf(c, 21, 5); r.d150 = dirOf(c, 150, 20); r.d365 = dirOf(c, 365, 60);
+    // ماهانه: آخرین بستهٔ هر ماه تقویمی
+    const mo = []; let lastKey = '';
+    for (let i = 0; i < c.length; i++) { const dt = new Date(S.d[i] * 86400000), key = dt.getUTCFullYear() * 12 + dt.getUTCMonth(); if (key !== lastKey) { mo.push({ key, c: c[i], d: S.d[i] }); lastKey = key; } else { mo[mo.length - 1].c = c[i]; mo[mo.length - 1].d = S.d[i]; } }
+    let mdir = null, mreg = null; if (mo.length >= 26) { const ys = mo.slice(-24).map((x) => Math.log(x.c)); mreg = logreg(ys); const ann = Math.exp(mreg.b * 12) - 1, resid = ys[23] - (mreg.a + mreg.b * 23); mdir = ann > 0.1 ? 1 : ann < -0.1 ? -1 : 0; mreg.ann = ann; mreg.resid = resid; mreg.mo = mo.slice(-24); }
+    r.mon = mdir; r.mon60 = null; if (mo.length >= 62) { const rg = logreg(mo.slice(-60).map((x) => Math.log(x.c))), an = Math.exp(rg.b * 12) - 1; r.mon60 = an > 0.1 ? 1 : an < -0.1 ? -1 : 0; r.ann60 = an; }
+    rows += '<tr><td><b>' + sym + '</b></td>' + TFS.map((t) => '<td style="color:' + (r[t[1]] == null ? '#888' : colr(r[t[1]])) + ';font-weight:700">' + (r[t[1]] == null ? '—' : (r[t[1]] > 0 ? up : r[t[1]] < 0 ? dn : mx) + ' ' + word(r[t[1]])) + '</td>').join('') + '</tr>';
+    if (sym === 'BTC') { btc = { r, mreg, c, S, H }; }
+  }
+  if (!btc) return '';
+  // ----- سطح خطر BTC: هر دلیل جدا و قابل فهم -----
+  const R = btc.r, rs = [], add = (pts, why) => rs.push([pts, why]);
+  if (R.d150 < 0) add(2, 'قیمت زیر میانگین ۵ ماهه است (روند میان‌مدت ریزشی)');
+  if (R.d21 < 0) add(1, 'قیمت زیر میانگین ۳ هفته است (روند کوتاه‌مدت ریزشی)');
+  if (R.d365 < 0) add(1, 'قیمت زیر میانگین یک‌ساله است (روند بلندمدت هم ریزشی)');
+  const c = btc.c, n = c.length, r7 = c[n - 1] / c[n - 8] - 1, r30 = c[n - 1] / c[n - 31] - 1;
+  if (r30 <= -0.15) add(1, 'در ۳۰ روز ' + (r30 * 100).toFixed(0) + '٪ افت کرده');
+  else if (r7 <= -0.08) add(1, 'در ۷ روز ' + (r7 * 100).toFixed(0) + '٪ افت کرده');
+  const mxA = (a, b) => Math.max.apply(null, c.slice(n - b, n - a)), mnA = (a, b) => Math.min.apply(null, c.slice(n - b, n - a));
+  if (mxA(0, 30) < mxA(30, 60) && mnA(0, 30) < mnA(30, 60)) add(1, 'سقف و کف‌ها پایین‌تر می‌آیند');
+  if (sirenSt && sirenSt.on) add(3, 'آژیر روشن است');
+  const ed = btc.S.d[n - 1], fund = lastMean(aux.fund.BTC, ed, 7), lsr = lastMean(aux.lsr.BTC, ed, 1);
+  if ((isFinite(fund) && fund >= 0.0094763) || (isFinite(lsr) && lsr >= 64.63)) add(1, 'بازار پر از لانگ‌های اهرمی است (شکننده)');
+  const pts = rs.reduce((a, x) => a + x[0], 0), lvl = pts >= 6 ? ['خطرناک — بازار در حال ریزش است', '#ff6b6b'] : pts >= 3 ? ['مراقب — نشانه‌های ریزش هست', '#ff9d4d'] : pts >= 1 ? ['کمی نگران‌کننده', '#e0c060'] : ['عادی — خبری از ریزش نیست', '#5fe0a0'];
+  // ----- جملهٔ ساده: کدام تایم‌فریم چه می‌گوید -----
+  const L = R.mon, L5 = R.mon60, M = R.d150, Sh = R.d21; let story = '';
+  if (L5 > 0) story += 'تصویر بزرگ (خط روند ماهانهٔ ۵ ساله، ' + (R.ann60 >= 0 ? '+' : '') + (R.ann60 * 100).toFixed(0) + '٪ در سال) هنوز صعودی است. '; else if (L5 != null) story += 'حتی خط روند ماهانهٔ ۵ ساله صعودی نیست. ';
+  if (L < 0) story += 'اما در ۲ سال اخیر خط روند ماهانه ریزشی شده'; else story += 'خط روند ماهانهٔ ۲ ساله ' + word(L);
+  story += (M < 0 ? '، میان‌مدت (۵ ماه) ریزشی است' : M > 0 ? '، میان‌مدت (۵ ماه) صعودی است' : '، میان‌مدت (۵ ماه) خنثی است') + (Sh < 0 ? ' و کوتاه‌مدت (۳ هفته) هم ریزشی است.' : Sh > 0 ? ' و کوتاه‌مدت (۳ هفته) صعودی است.' : ' و کوتاه‌مدت خنثی است.');
+  if (L5 > 0 && M < 0) story += ' یعنی الان یک ریزش بزرگ داخل یک روند بزرگ‌تر صعودی در جریان است؛ تا قیمت دوباره بالای میانگین ۵ ماهه نبندد، ریزش تمام‌شده حساب نمی‌شود.';
+  const hs = (R.h24 != null ? ' در ۲۴ ساعت اخیر ' + word(R.h24) + '، در ۷ روز اخیر ' + (R.h168 != null ? word(R.h168) : '—') + '.' : '');
+  const reasons = rs.length ? '<ul style="margin:6px 18px 0 0;padding:0">' + rs.map((x) => '<li>' + x[1] + ' <span class="mut">(+' + x[0] + ')</span></li>').join('') + '</ul>' : '';
+  const reg = btc.mreg;
+  const chartInfo = reg ? 'خط روند ماهانهٔ BTC (۲۴ ماه گذشته): شیب ' + (reg.ann >= 0 ? '+' : '') + (reg.ann * 100).toFixed(0) + '٪ در سال؛ قیمت اکنون ' + (Math.abs(reg.resid) < reg.sd * 0.5 ? 'نزدیک خط' : reg.resid < 0 ? 'پایین‌تر از خط' : 'بالاتر از خط') + ' است (' + (reg.resid >= 0 ? '+' : '') + (reg.resid * 100).toFixed(0) + '٪ فاصله، نواری ±' + (reg.sd * 100).toFixed(0) + '٪).' : '';
+  TM.monthly = reg;
+  return '<div class="card"><h2>نقشهٔ روند — بازار در چه تایم‌فریمی ریزشی است؟</h2>' +
+    '<div class="verdict" style="border-color:' + lvl[1] + ';color:' + lvl[1] + ';font-size:1.1em"><b>خطر ریزش: ' + lvl[0] + '</b> (' + pts + ' از ۱۰ نقطهٔ هشدار)</div>' +
+    '<div style="margin-top:8px"><b>خلاصه:</b> ' + story + hs + '</div>' +
+    '<div style="margin-top:6px"><b>چرا این سطح خطر؟</b>' + reasons + '</div>' +
+    '<div class="tw" style="margin-top:10px"><table><tr><th>ارز</th>' + TFS.map((t) => '<th>' + t[0] + '</th>').join('') + '</tr>' + rows + '</table></div>' +
+    '<div class="mut" style="margin-top:4px">هر خانه: قیمت بالای میانگین همان بازه = ▲ صعودی، زیر آن = ▼ ریزشی، نزدیک آن = ■ خنثی. خط ماهانه = شیب خط رگرسیون قیمت‌های ماهانه (بالای ۱۰٪ در سال صعودی، زیر ۱۰٪- ریزشی).</div>' +
+    '<h3 style="margin:12px 0 4px">خط روند ماهانهٔ BTC (۲ سال اخیر)</h3><canvas id="cvM" height="230" style="width:100%"></canvas><div style="margin-top:4px">' + chartInfo + '</div>' +
+    '<div class="mut" style="margin-top:8px"><b>صادقانه:</b> در آزمون‌های گذشتهٔ ما فقط «زیر/بالای میانگین ۵ ماهه» و ترکیب «بالای آن ولی افت تند» اطلاع واقعی دربارهٔ ریزش داشتند. بقیهٔ تایم‌فریم‌ها «وضعیت» را درست می‌خوانند ولی پیش‌بینی نیستند. امتیاز خطر یک قاعدهٔ ساده و شفاف است، نه احتمال.</div></div>';
+}
+function drawTrendMap() {
+  const cv = document.getElementById('cvM'), reg = TM.monthly; if (!cv || !reg) return;
+  const W = cv.clientWidth || 340, H = 230, dpr = Math.min(2, window.devicePixelRatio || 1); cv.width = W * dpr; cv.height = H * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  const mo = reg.mo, n = mo.length, ys = mo.map((x) => Math.log(x.c)), fit = (i) => reg.a + reg.b * i;
+  const lo = Math.min.apply(null, ys.concat([fit(0) - reg.sd, fit(n - 1) - reg.sd])) - 0.05, hi = Math.max.apply(null, ys.concat([fit(0) + reg.sd, fit(n - 1) + reg.sd])) + 0.05;
+  const px = (i) => 38 + (i / (n - 1)) * (W - 50), py = (v) => 12 + (1 - (v - lo) / (hi - lo)) * (H - 40);
+  g.fillStyle = '#0b1220'; g.fillRect(0, 0, W, H);
+  g.fillStyle = 'rgba(95,224,160,.10)'; g.beginPath(); g.moveTo(px(0), py(fit(0) + reg.sd)); g.lineTo(px(n - 1), py(fit(n - 1) + reg.sd)); g.lineTo(px(n - 1), py(fit(n - 1) - reg.sd)); g.lineTo(px(0), py(fit(0) - reg.sd)); g.closePath(); g.fill();
+  g.strokeStyle = '#5fe0a0'; g.setLineDash([6, 4]); g.lineWidth = 1.5; g.beginPath(); g.moveTo(px(0), py(fit(0))); g.lineTo(px(n - 1), py(fit(n - 1))); g.stroke(); g.setLineDash([]);
+  g.strokeStyle = '#7fc8ff'; g.lineWidth = 2; g.beginPath(); ys.forEach((v, i) => (i ? g.lineTo(px(i), py(v)) : g.moveTo(px(i), py(v)))); g.stroke();
+  g.fillStyle = '#7fc8ff'; ys.forEach((v, i) => { g.beginPath(); g.arc(px(i), py(v), 2.5, 0, 7); g.fill(); });
+  g.fillStyle = '#ffd36a'; g.beginPath(); g.arc(px(n - 1), py(ys[n - 1]), 5, 0, 7); g.fill();
+  g.fillStyle = '#9fb3c8'; g.font = '11px sans-serif'; g.textAlign = 'right';
+  for (let k = 0; k < 4; k++) { const v = lo + (hi - lo) * (k / 3.0), y = py(v); g.fillText(Math.round(Math.exp(v) / 1000) + 'k', 32, y + 4); g.strokeStyle = 'rgba(255,255,255,.06)'; g.beginPath(); g.moveTo(38, y); g.lineTo(W - 12, y); g.stroke(); }
+  g.textAlign = 'center'; [0, Math.floor(n / 2), n - 1].forEach((i) => { const dt = new Date(mo[i].d * 86400000); g.fillText(dt.getUTCFullYear() + '/' + (dt.getUTCMonth() + 1), px(i), H - 8); });
 }
 // ---------- فرمان: مشابه‌یاب تاریخی + مغز تصمیم ----------
 function sirenFlags(c) {  // سه شرط آژیر برای هر روز (بدون نگاه به آینده)
@@ -721,7 +797,8 @@ async function run() {
     let cmd = '';
     if (btc) { const mvh = mvrvCard(btc, onch); cmd = commandCard(btc, btcSt, sirenSt); html += mvh + partsCard(btc) + swingCard(btc) + simCard(); }
     let radar = ''; try { radar = radarCard(SM, aux, await h1P, await l1P, await mcP, oh, meta); } catch (e) { radar = '<div class="card"><h2>رادار</h2><div class="mut">خطا: ' + e.message + '</div></div>'; }
-    $('out').innerHTML = radar + cmd + whoLostCard(SM, aux) + whaleCard(oh, onch, await whP) + ledgerCard(await ldP) + html; drawCommand(); drawSwing(); drawSim();
+    let tmap = ''; try { tmap = trendMapCard(SM, aux, await h1P, sirenSt); } catch (e) { tmap = '<div class="card"><h2>نقشهٔ روند</h2><div class="mut">خطا: ' + e.message + '</div></div>'; }
+    $('out').innerHTML = tmap + radar + cmd + whoLostCard(SM, aux) + whaleCard(oh, onch, await whP) + ledgerCard(await ldP) + html; drawTrendMap(); drawCommand(); drawSwing(); drawSim();
   } catch (e) { log('خطا: ' + e.message, 'dn'); }
   $('go').disabled = false;
 }
