@@ -224,6 +224,38 @@ function parabolaCard(S) {
 }
 // آژیر: در صلح خاموش؛ وقتی یکی از سه شرط (روی BTC) در ۳ روز اخیر روشن بوده، حسگر روشن می‌شود (siren.js).
 // آزمون روی تاریخ BTC: ۸٪ روزها روشن؛ ظرف ۳۰ روز افت ≥۲۰٪ بیشتر: ۳۳٪ (حالت عادی ۲۰٪).
+// ---------- چه کسی باخت؟ (لیکویید ۳۰ روز اخیر) ----------
+// لانگ لیکویید = خریدار اهرمیِ مجبور به فروش؛ شورت لیکویید = فروشندهٔ اهرمیِ مجبور به خرید. فقط قراردادهای دائمی USDT (تجمیع Coinalyze).
+function whoLostCard(SM, aux) {
+  const syms = ['BTC', 'ETH', 'BNB', 'SUI'], tops = {}; let tl = 0, ts = 0, rows = '', ok = 0, endDay = 0;
+  for (const sym of syms) {
+    const S = SM[sym], L = aux.liq && aux.liq[sym]; if (!S || !L) continue;
+    const n = S.c.length, ed = S.d[n - 1]; let l = 0, s = 0, k = 0; const days = [];
+    for (let i = 0; i < 30; i++) { const v = L.get(ed - i); if (!v) continue; l += v.l; s += v.s; k++; days.push([ed - i, v.l + v.s]); }
+    if (k < 24 || n < 32) continue; ok++; tl += l; ts += s; endDay = Math.max(endDay, ed);
+    days.sort((a, b) => b[1] - a[1]); tops[sym] = days.slice(0, 5).map((x) => x[0]);
+    const bd = days[0][0], ix = S.d.indexOf(bd), mv = ix > 0 ? S.c[ix] / S.c[ix - 1] - 1 : NaN;
+    rows += '<tr><td>' + sym + '</td><td>' + pct(S.c[n - 1] / S.c[n - 31] - 1) + '</td><td>' + usd(l) + '</td><td>' + usd(s) + '</td><td><b>' + pct(l / (l + s)) + '</b></td><td>' + dstr(bd * 86400) + ' (' + pct(mv) + ')</td></tr>';
+  }
+  if (ok < 2) return '';
+  const share = tl / (tl + ts), cnt = {}; for (const sym in tops) for (const d of tops[sym]) cnt[d] = (cnt[d] || 0) + 1;
+  const common = Object.keys(cnt).filter((d) => cnt[d] >= 3).map(Number).sort((a, b) => a - b);
+  let ctx = '';
+  const L = aux.liq.BTC, SB = SM.BTC;
+  if (L && SB) {
+    const ed = SB.d[SB.c.length - 1], keys = Array.from(L.keys()).sort((a, b) => a - b), vals = []; let cur = NaN;
+    for (const d of keys) { if (d < keys[0] + 40 || d > ed) continue; let l = 0, s = 0, k = 0; for (let i = 0; i < 30; i++) { const v = L.get(d - i); if (v) { l += v.l; s += v.s; k++; } } if (k >= 24) { const sh = l / (l + s); vals.push(sh); if (d === ed) cur = sh; } }
+    if (isFinite(cur) && vals.length > 200) { vals.sort((a, b) => a - b); ctx = 'سهم لانگ بیت‌کوین در ۳۰ روز اخیر ' + pct(cur) + ' است؛ از ۲۰۲۲ تاکنون میانه ' + pct(vals[Math.floor(vals.length / 2)]) + ' بوده و این مقدار از ' + pct(vals.filter((v) => v < cur).length / vals.length) + ' از روزها بیشتر است.'; }
+  }
+  const verdict = share >= 0.65 ? ['v-r', 'تقریباً یک‌طرفه: خریداران اهرمی له شدند (فشار فروش اجباری).'] : share <= 0.45 ? ['v-g', 'فروشندگان اهرمی له شدند (فشار خرید اجباری).'] : ['v-y', 'متعادل: هر دو طرف باختند.'];
+  return '<div class="card"><h2>چه کسی باخت؟ ۳۰ روز اخیر</h2>' +
+    '<div class="verdict ' + verdict[0] + '">' + pct(share) + ' از پولِ لیکویید‌شده، لانگ بود. ' + verdict[1] + '</div>' +
+    '<div style="margin-top:8px">در ' + ok + ' ارز، ' + usd(tl) + ' لانگ و ' + usd(ts) + ' شورت به‌اجبار بسته شد.' + (common.length ? ' روزهای پرلیکوییدِ مشترک بین دست‌کم ۳ ارز: <b>' + common.map((d) => dstr(d * 86400)).join('، ') + '</b> (ضربهٔ کل بازار، نه یک ارز؛ یکی‌شان روز صعود بود و شورت‌ها هم له شدند).' : '') + '</div>' +
+    '<div class="tw" style="margin-top:8px"><table><tr><th>ارز</th><th>۳۰ روز</th><th>لانگ له‌شده</th><th>شورت له‌شده</th><th>سهم لانگ</th><th>بدترین روز</th></tr>' + rows + '</table></div>' +
+    (ctx ? '<div style="margin-top:8px">' + ctx + '</div>' : '') +
+    '<div class="mut" style="margin-top:8px"><b>معنی درست:</b> این عدد «نتیجه» است نه «علت». یعنی در این ریزش، کسانی که با اهرم در سراشیبی خریدند از بازار بیرون پرتاب شدند. دربارهٔ کیفیت دارایی چیزی نمی‌گوید. فقط از قراردادهای اهرمی صرافی‌های بزرگ می‌آید، نه از همهٔ معامله‌گران؛ «درصد افراد بازنده» از این داده درنمی‌آید، فقط «درصد پولِ له‌شده».<br>' +
+    '<b>آزمون صادقانه (۲۰۲۲ تا امروز، ۸ دوره در BTC که سهم لانگ ۳۰ روزه ≥۶۲٪ بود):</b> ظرف ۳۰ روز بعد، در ۶۲٪ موارد افت بیش از ۱۰٪ دیگر آمد؛ ولی در دوره‌هایی که فقط بازار ۱۵٪ ریخته بود (بدون شرط لیکویید) هم ۵۰٪ بود و در روز عادی ۲۲٪. یعنی اضافه بر «بازار در حال ریزش است» اطلاعاتی ندارد. ۹۰ روز بعد BTC در ۶ از ۷ مورد بالاتر بود، ولی در سایر ریزش‌ها هم همین (۶ از ۷)؛ نمونه کوچک است. پس رادار این را «خوانش وضعیت» نشان می‌دهد، نه علامت خرید یا فروش.</div></div>';
+}
 // ---------- فرمان: مشابه‌یاب تاریخی + مغز تصمیم ----------
 function sirenFlags(c) {  // سه شرط آژیر برای هر روز (بدون نگاه به آینده)
   const n = c.length, sm = smaArr(c, 150), rr = c.map((x, i) => (i ? Math.log(x / c[i - 1]) : NaN)), vs = stdRoll(rr, 30);
@@ -503,18 +535,18 @@ async function run() {
     // map of {l,s} objects: dayMap filters with isFinite, so rebuild liq explicitly
     aux.liq = {};
     for (const s of (liq && liq.data) || []) { const b = String(s.symbol).split(/USDT|USD/)[0]; const m = (aux.liq[b] = new Map()); for (const x of s.history || []) m.set(Math.floor(x.t / 86400), { l: +x.l, s: +x.s }); }
-    let html = '', btc = null, btcSt = null, sirenSt = null;
+    let html = '', btc = null, btcSt = null, sirenSt = null; const SM = {};
     { const SB = buildSeries('BTC', oh, price, todayDay); if (SB && SB.c.length >= 400) { sirenSt = sirenState(SB, aux); if (window.Siren) Siren.update(sirenSt); } }
     for (const sym of COINS) {
       const S = buildSeries(sym, oh, price, todayDay);
       if (!S || S.c.length < 400) { html += '<div class="card"><h2>' + sym + '</h2><div class="mut">داده کافی نیست.</div></div>'; continue; }
-      const cs = coinState(sym, S, aux); if (sym === 'BTC') { btc = S; btcSt = cs; }
+      SM[sym] = S; const cs = coinState(sym, S, aux); if (sym === 'BTC') { btc = S; btcSt = cs; }
       html += coinCard(cs);
     }
     html += BACKTEST;
     let cmd = '';
     if (btc) { const mvh = mvrvCard(btc, onch); cmd = commandCard(btc, btcSt, sirenSt); html += mvh + partsCard(btc) + swingCard(btc) + simCard(); }
-    $('out').innerHTML = cmd + html; drawCommand(); drawSwing(); drawSim();
+    $('out').innerHTML = cmd + whoLostCard(SM, aux) + html; drawCommand(); drawSwing(); drawSim();
   } catch (e) { log('خطا: ' + e.message, 'dn'); }
   $('go').disabled = false;
 }
