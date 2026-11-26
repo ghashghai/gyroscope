@@ -42,7 +42,7 @@ button{background:var(--gold);color:var(--ink);border:0;border-radius:10px;paddi
 <div id="out"></div>
 </div>
 <script src="scene.js?v=27"></script>
-<script src="siren.js?v=27"></script>
+<script src="siren.js?v=28"></script>
 <script>
 const COINS = ['BTC', 'ETH', 'BNB', 'SUI'];
 const $ = (id) => document.getElementById(id);
@@ -224,18 +224,24 @@ function parabolaCard(S) {
 }
 // آژیر: در صلح خاموش؛ وقتی یکی از سه شرط (روی BTC) در ۳ روز اخیر روشن بوده، حسگر روشن می‌شود (siren.js).
 // آزمون روی تاریخ BTC: ۸٪ روزها روشن؛ ظرف ۳۰ روز افت ≥۲۰٪ بیشتر: ۳۳٪ (حالت عادی ۲۰٪).
+// ---------- فرمان: مشابه‌یاب تاریخی + مغز تصمیم ----------
+function sirenFlags(c) {  // سه شرط آژیر برای هر روز (بدون نگاه به آینده)
+  const n = c.length, sm = smaArr(c, 150), rr = c.map((x, i) => (i ? Math.log(x / c[i - 1]) : NaN)), vs = stdRoll(rr, 30);
+  const A = new Uint8Array(n), B = new Uint8Array(n), C = new Uint8Array(n);
+  for (let i = 200; i < n; i++) {
+    if (isFinite(sm[i]) && c[i] / sm[i] - 1 > 1) { let lo = 0, tot = 0; for (let j = 200; j <= i; j++) if (isFinite(vs[j])) { tot++; if (vs[j] < vs[i]) lo++; } if (tot && lo / tot > 0.85) A[i] = 1; }
+    if (c[i] < sm[i]) for (let j = i - 3; j < i; j++) if (isFinite(sm[j]) && c[j] >= sm[j]) { B[i] = 1; break; }
+    if (c[i] / c[i - 7] - 1 <= -0.15) C[i] = 1;
+  }
+  return { A, B, C, sm };
+}
 function sirenState(S, aux) {
-  const c = S.c, n = c.length, sm = smaArr(c, 150), rr = c.map((x, i) => (i ? Math.log(x / c[i - 1]) : NaN)), vs = stdRoll(rr, 30);
-  const volPct = (i) => { let lo = 0, tot = 0; for (let j = 200; j <= i; j++) if (isFinite(vs[j])) { tot++; if (vs[j] < vs[i]) lo++; } return tot ? lo / tot : NaN; };
-  const LATCH = 3, FRESH = 3, why = [];
-  for (let k = 0; k < LATCH; k++) {
+  const c = S.c, n = c.length, F = sirenFlags(c), why = [];
+  for (let k = 0; k < 3; k++) {  // هر شرطی در ۳ روز اخیر روشن بوده باشد
     const i = n - 1 - k; if (i < 200) break; const day = dstr(S.d[i] * 86400);
-    if (isFinite(sm[i]) && c[i] / sm[i] - 1 > 1 && volPct(i) > 0.85 && !why.some((w) => w.t === 'A'))
-      why.push({ t: 'A', day, txt: 'شتاب: قیمت بیش از ۲ برابر میانگین ۱۵۰ روزه و نوسان بسیار بالا (در آزمون ۴۵٪؛ فقط ۵ دوره)' });
-    let fresh = false; if (c[i] < sm[i]) for (let j = i - FRESH; j < i; j++) if (isFinite(sm[j]) && c[j] >= sm[j]) fresh = true;
-    if (fresh && !why.some((w) => w.t === 'B')) why.push({ t: 'B', day, txt: 'تازه زیر میانگین ۱۵۰ روزه بسته شد (در آزمون ۲۶٪؛ ضعیف‌ترین نشانه، ولی همان قانون خروج است)' });
-    if (i >= 7 && c[i] / c[i - 7] - 1 <= -0.15 && !why.some((w) => w.t === 'C'))
-      why.push({ t: 'C', day, txt: 'افت ۷ روزه ' + pct(c[i] / c[i - 7] - 1) + ' (در آزمون ۳۳٪)' });
+    if (F.A[i] && !why.some((w) => w.t === 'A')) why.push({ t: 'A', day, txt: 'شتاب: قیمت بیش از ۲ برابر میانگین ۱۵۰ روزه و نوسان بسیار بالا (در آزمون ۴۵٪؛ فقط ۵ دوره)' });
+    if (F.B[i] && !why.some((w) => w.t === 'B')) why.push({ t: 'B', day, txt: 'تازه زیر میانگین ۱۵۰ روزه بسته شد (در آزمون ۲۶٪؛ ضعیف‌ترین نشانه، ولی همان قانون خروج است)' });
+    if (F.C[i] && !why.some((w) => w.t === 'C')) why.push({ t: 'C', day, txt: 'افت ۷ روزه ' + pct(c[i] / c[i - 7] - 1) + ' (در آزمون ۳۳٪)' });
   }
   let extra = '';
   if (why.length) {
@@ -243,6 +249,100 @@ function sirenState(S, aux) {
     if (L && L.get(ed)) { let s = 0, k = 0; for (let i = 1; i <= 30; i++) { const v = L.get(ed - i); if (v) { s += v.l + v.s; k++; } } const t = L.get(ed); const ratio = k >= 20 ? (t.l + t.s) / (s / k) : NaN; if (ratio >= 3) extra = '<div>دلیل کمکی: لیکویید دیروز ' + ratio.toFixed(1) + ' برابر میانگین ۳۰ روز بود (فقط توضیح؛ به‌تنهایی آژیر نمی‌زند).</div>'; }
   }
   return { on: why.length > 0, why, extra };
+}
+function ladderLevels() {  // پله‌های هفت‌پارتی (همان‌ها که در کارت «هفت پارت» است)
+  const rp = window.__rp; if (!rp) return [];
+  return [
+    { k: 1, p: 57356, why: 'فیبوناچی ۰٫۶۱۸', kind: 'پارت کوچک' },
+    { k: 2, p: rp, why: 'MVRV=۱ (قیمت خرید میانگین دارندگان)', kind: 'پارت کوچک' },
+    { k: 3, p: rp * 0.8, why: 'MVRV=۰٫۸ (تنها نشانهٔ کف قوی در آزمون)', kind: 'پارت اصلی' },
+    { k: 4, p: 42000, why: 'محور ۴۲k تو', kind: 'پارت اصلی' },
+    { k: 5, p: 39068, why: 'فیبوناچی ۰٫۷۸۶', kind: 'پارت اصلی' },
+    { k: 6, p: rp * 0.7, why: 'MVRV=۰٫۷ (کف‌های ۲۰۱۵ و ۲۰۱۸)', kind: 'پارت اصلی' }];
+}
+// K روزِ تاریخیِ مشابه امروز (از ۲۰۱۳). اگر آژیر روشن است فقط از روزهای آژیر؛ وگرنه از روزهایی که قیمت همان طرف میانگین ۱۵۰ بود.
+function analogSet(S, sirenOn, K) {
+  const c = S.c, d = S.d, n = c.length, H = 90, F = sirenFlags(c), sm = F.sm;
+  const lr = c.map((x, i) => (i ? Math.log(x / c[i - 1]) : NaN)), vol = stdRoll(lr, 30);
+  const d13 = Date.UTC(2013, 0, 1) / 86400000; let start = 365; while (start < n && d[start] < d13) start++;
+  const hmax = new Float64Array(n); for (let i = 365; i < n; i++) { let m = 0; for (let j = i - 364; j <= i; j++) if (c[j] > m) m = c[j]; hmax[i] = m; }
+  const feat = (i) => [Math.log(c[i] / sm[i]), Math.log(c[i] / c[i - 7]), Math.log(c[i] / c[i - 30]), Math.log(c[i] / hmax[i]), vol[i]];
+  const W = [1.2, 1, 1, 1.2, 0.8], today = feat(n - 1), cand = [];
+  for (let i = start; i <= n - 1 - H; i++) if (isFinite(sm[i]) && isFinite(vol[i])) cand.push(i);
+  const fs = cand.map(feat), sd = [0, 1, 2, 3, 4].map((k) => { const m = fs.reduce((a, f) => a + f[k], 0) / fs.length; return Math.sqrt(fs.reduce((a, f) => a + (f[k] - m) ** 2, 0) / fs.length) || 1; });
+  const below = c[n - 1] < sm[n - 1], pool = [];
+  cand.forEach((i, ix) => {
+    const ok = sirenOn ? (F.A[i] || F.B[i] || F.C[i] || F.A[i - 1] || F.B[i - 1] || F.C[i - 1] || F.A[i - 2] || F.B[i - 2] || F.C[i - 2]) : ((c[i] < sm[i]) === below);
+    if (!ok) return; let s = 0; for (let k = 0; k < 5; k++) s += W[k] * ((fs[ix][k] - today[k]) / sd[k]) ** 2; pool.push({ i, dist: Math.sqrt(s) });
+  });
+  pool.sort((a, b) => a.dist - b.dist);
+  const picks = []; for (const p of pool) { if (picks.length >= K) break; if (picks.every((q) => Math.abs(q.i - p.i) >= 30)) picks.push(p); }
+  for (const p of picks) { p.path = []; for (let t = 0; t <= H; t++) p.path.push(c[p.i + t] / c[p.i]); p.day = d[p.i]; }
+  picks.sort((a, b) => a.day - b.day);
+  return { picks, poolSize: pool.length, H, sirenOn };
+}
+function analogStats(an, p0, lv) {
+  const H = an.H, P = an.picks, m = P.length;
+  const med = (a) => { if (!a.length) return NaN; const b = a.slice().sort((x, y) => x - y); return b[Math.floor((b.length - 1) / 2)]; };
+  const q = (t, f) => { const a = P.map((p) => p.path[t]).sort((x, y) => x - y); return a[Math.floor(f * (a.length - 1))]; };
+  const mid = [], lo = [], hi = []; for (let t = 0; t <= H; t++) { mid.push(q(t, 0.5)); lo.push(q(t, 0.25)); hi.push(q(t, 0.75)); }
+  for (const p of P) { let mn = 9, tm = 0; for (let t = 1; t <= H; t++) if (p.path[t] < mn) { mn = p.path[t]; tm = t; } p.min = mn; p.tmin = tm; }
+  const levels = lv.map((l) => { const hits = []; for (const p of P) for (let t = 1; t <= H; t++) if (p0 * p.path[t] <= l.p) { hits.push(t); break; } return Object.assign({}, l, { share: hits.length / m, medDay: med(hits) }); });
+  const sh = (fn) => P.filter(fn).length / m;
+  return { mid, lo, hi, levels, minMed: med(P.map((p) => p.min)), tminMed: med(P.map((p) => p.tmin)), p10: sh((p) => p.min <= 0.9), p20: sh((p) => p.min <= 0.8), p30: sh((p) => p.min <= 0.7), up30: sh((p) => p.path[30] > 1), up90: sh((p) => p.path[H] > 1), n: m };
+}
+function commandCard(S, st, sirenSt) {
+  const c = S.c, n = c.length, p0 = c[n - 1], sm = smaArr(c, 150)[n - 1], sOn = !!(sirenSt && sirenSt.on);
+  const f = (x) => Math.round(x).toLocaleString('en-US'), fk = (x) => (x / 1000).toFixed(1) + 'k', pc = (x) => Math.round(x * 100) + '٪';
+  const lv = ladderLevels(); const an = analogSet(S, sOn, 12); if (an.picks.length < 4) return '';
+  const lows = lv.filter((l) => l.p < p0).sort((a, b) => b.p - a.p), stt = analogStats(an, p0, lows);
+  window.__cmd = { an, stt, p0, sm, lv, S };
+  const aOn = !!(sirenSt && sirenSt.why.some((w) => w.t === 'A')), out = !st.above || aOn;
+  let cls, head;
+  if (out) { cls = 'v-r'; head = 'بیرون از بازار بمان: هدف ۰٪ بیت‌کوین و ۱۰۰٪ تتر.'; }
+  else if (st.expo < 1) { cls = 'v-y'; head = 'در بازار با ' + Math.round(st.expo * 100) + '٪ (بالای روند ولی داغ).'; }
+  else { cls = 'v-g'; head = 'در بازار: ۱۰۰٪ طبق قاعده.'; }
+  const why = [!st.above ? 'قیمت ' + pct(Math.exp(st.dist) - 1) + ' نسبت به میانگین ۱۵۰ روزه (' + f(sm) + ')' : 'قیمت بالای میانگین ۱۵۰ روزه (' + f(sm) + ')', sOn ? 'آژیر روشن: ' + sirenSt.why.map((w) => w.t).join(' و ') : 'آژیر خاموش'].join(' · ');
+  const nx = stt.levels[0];
+  const nextTxt = nx ? 'سفارش شرطی بعدی: <b>پارت ' + nx.k + ' در ' + f(nx.p) + ' دلار</b> (' + pct(nx.p / p0 - 1) + ' از امروز). از ' + stt.n + ' مشابه، <b>' + pc(nx.share) + '</b> ظرف ۹۰ روز به این سطح رسیدند' + (isFinite(nx.medDay) ? ' (میانهٔ روز ' + nx.medDay + ')' : '') + '.' : 'همهٔ پله‌های پایین‌تر رسیده‌اند؛ فقط پارت ۷ (ذخیره، بالای میانگین ۱۵۰) مانده.';
+  let rows = '<tr><td>فروش</td><td>زیر ' + f(sm) + ' ببندد یا آژیر A</td><td>' + pct(sm / p0 - 1) + ' بالاتر</td><td>' + (out ? '<b class="dn">فعال</b>' : 'آماده') + '</td></tr>';
+  for (const l of lv.slice().sort((a, b) => b.p - a.p)) {
+    const e = stt.levels.find((x) => x.k === l.k);
+    rows += '<tr><td>خرید پارت ' + l.k + '</td><td>' + f(l.p) + '</td><td>' + (e ? pct(l.p / p0 - 1) : '—') + '</td><td>' + (e ? pc(e.share) + (isFinite(e.medDay) ? ' · روز ' + e.medDay : '') : '<b class="up">رسیده</b>') + '</td></tr>';
+  }
+  rows += '<tr><td>خرید پارت ۷</td><td>بستن بالای ' + f(sm) + '</td><td>' + pct(sm / p0 - 1) + ' بالاتر</td><td>' + (st.above ? '<b class="up">فعال</b>' : 'منتظر تأیید روند') + '</td></tr>';
+  let arows = ''; for (const p of an.picks) arows += '<tr><td>' + dstr(p.day * 86400) + '</td><td class="' + (p.min <= 0.8 ? 'dn' : p.min <= 0.9 ? 'wn' : 'up') + '">' + pct(p.min - 1) + '</td><td>' + p.tmin + '</td><td>' + pct(p.path[30] - 1) + '</td><td>' + pct(p.path[an.H] - 1) + '</td></tr>';
+  return '<div class="card"><h2>فرمان</h2><div class="verdict ' + cls + '">' + head + '</div><div class="mut">' + why + '</div>' +
+    '<div style="margin-top:8px">' + nextTxt + '</div>' +
+    '<div class="tw" style="margin-top:8px"><table><tr><th>فرمان</th><th>قیمت</th><th>از امروز</th><th>مشابه‌ها (۹۰ روز)</th></tr>' + rows + '</table></div>' +
+    '<h2 style="margin-top:14px">مختصات: ۹۰ روز آینده در ' + stt.n + ' روزِ مشابه</h2><canvas id="cv4" style="height:300px"></canvas>' +
+    '<div class="mut" style="margin-top:4px"><b style="color:#e8645d">قرمز</b> = افت بیش از ۲۰٪ از قیمت امروز، <b style="color:#e0a53a">زرد</b> = ۱۰ تا ۲۰٪، <b style="color:#43b985">سبز</b> = کمتر از ۱۰٪. خط سفید = میانه، سایه = ۲۵ تا ۷۵٪ مشابه‌ها. خط‌چین طلایی = پله‌های خرید، خط‌چین آبی = میانگین ۱۵۰ روزه.</div>' +
+    '<div style="margin-top:8px"><b>خلاصهٔ مشابه‌ها:</b> میانهٔ پایین‌ترین قیمت ≈ ' + fk(p0 * stt.minMed) + ' در روز ' + stt.tminMed + '. افت بیشتر از ۱۰٪ / ۲۰٪ / ۳۰٪ ظرف ۹۰ روز: ' + pc(stt.p10) + ' / ' + pc(stt.p20) + ' / ' + pc(stt.p30) + '. بالاتر از امروز بعد از ۳۰ روز: ' + pc(stt.up30) + '، بعد از ۹۰ روز: ' + pc(stt.up90) + '.</div>' +
+    '<div class="tw" style="margin-top:8px"><table><tr><th>روز مشابه</th><th>افت بعدی</th><th>روز کف</th><th>۳۰ روز</th><th>۹۰ روز</th></tr>' + arows + '</table></div>' +
+    '<div class="mut" style="margin-top:6px">چطور انتخاب شد: از ۲۰۱۳ به بعد، ' + stt.n + ' روز که بیشترین شباهت را به امروز داشتند (فاصله از میانگین ۱۵۰ روزه، افت ۷ و ۳۰ روزه، افت از سقف یک‌ساله، نوسان ۳۰ روزه)، از میان روزهایی که ' + (sOn ? 'آژیر روشن بود' : 'قیمت ' + (st.above ? 'بالای' : 'زیر') + ' میانگین ۱۵۰ روزه بود') + '؛ دست‌کم ۳۰ روز از هم دور. هر مسیر ۹۰ روزِ بعدِ آن روز است که روی قیمت امروز سوار شده. فرمان‌ها همان قاعده‌های خودت‌اند (خروج زیر میانگین ۱۵۰، پله‌های هفت‌پارتی)، مشابه‌ها فقط شاهد می‌دهند. </div><div class="mut" style="margin-top:6px"><b>بازآزمایی صادقانه (فقط با داده‌ی قبل از هر روز):</b> روی ۵۱ دورهٔ آژیر از ۲۰۱۶، میانگین پیش‌بینی مشابه‌ها (۴۳٪ افت ۲۰٪ در ۹۰ روز) با واقعیت (۴۳٪) برابر بود، ولی مشابه‌ها نتوانستند دوره‌های بدتر را از بهتر جدا کنند (همبستگی رتبه‌ای −۰٫۱۹). در حالت آرام (مثل امروز، ۷۴ نمونه) پیش‌بینی ۴۷٪ بود و واقعیت ۳۵٪، همبستگی −۰٫۲۷. پس این مسیرها «تصویر نرخ پایه»‌اند، نه پیش‌بینی ویژهٔ امروز، و فرمان‌ها از آن‌ها تغذیه نمی‌شوند: فقط از قاعده‌های خودت می‌آیند.</div></div>';
+}
+function drawCommand() {
+  const cv = $('cv4'), Dd = window.__cmd; if (!cv || !Dd) return;
+  const { an, stt, p0, sm, lv, S } = Dd, c = S.c, n = c.length, H = an.H, B0 = 30;
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, Hh = cv.clientHeight;
+  cv.width = W * dpr; cv.height = Hh * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  let lo = p0, hi = p0; for (const p of an.picks) for (const r of p.path) { lo = Math.min(lo, p0 * r); hi = Math.max(hi, p0 * r); }
+  for (const l of lv) lo = Math.min(lo, l.p * 0.97); hi = Math.max(hi, sm * 1.02);
+  for (let i = n - 1 - B0; i < n; i++) { lo = Math.min(lo, c[i]); hi = Math.max(hi, c[i]); }
+  lo = Math.log(lo * 0.96); hi = Math.log(hi * 1.03);
+  const L = 6, R = W - 6, T = 8, Bt = Hh - 20, X = (t) => L + ((t + B0) / (H + B0)) * (R - L), Y = (p) => Bt - ((Math.log(p) - lo) / (hi - lo)) * (Bt - T);
+  g.font = '10px sans-serif'; g.textAlign = 'left';
+  for (const k of [20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 120, 140]) { const y = Y(k * 1000); if (y < T + 4 || y > Bt - 2) continue; g.strokeStyle = 'rgba(156,163,187,.13)'; g.lineWidth = 1; g.beginPath(); g.moveTo(L, y); g.lineTo(R, y); g.stroke(); g.fillStyle = 'rgba(156,163,187,.55)'; g.fillText(k + 'k', L + 1, y - 2); }
+  g.fillStyle = 'rgba(235,232,223,.10)'; g.beginPath(); for (let t = 0; t <= H; t += 2) { const x = X(t), y = Y(p0 * stt.hi[t]); t ? g.lineTo(x, y) : g.moveTo(x, y); } for (let t = H; t >= 0; t -= 2) g.lineTo(X(t), Y(p0 * stt.lo[t])); g.closePath(); g.fill();
+  g.lineWidth = 1.3; for (const p of an.picks) { g.strokeStyle = p.min <= 0.8 ? 'rgba(232,100,93,.6)' : p.min <= 0.9 ? 'rgba(224,165,58,.6)' : 'rgba(67,185,133,.6)'; g.beginPath(); for (let t = 0; t <= H; t++) { const x = X(t), y = Y(p0 * p.path[t]); t ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
+  g.setLineDash([4, 4]); g.strokeStyle = 'rgba(74,163,255,.75)'; g.beginPath(); g.moveTo(L, Y(sm)); g.lineTo(R, Y(sm)); g.stroke(); g.fillStyle = 'rgba(74,163,255,.95)'; g.textAlign = 'right'; g.fillText('SMA150 ' + (sm / 1000).toFixed(1) + 'k', R, Y(sm) - 3);
+  let ly = -99; for (const l of lv.slice().sort((a, b) => b.p - a.p)) { const y = Y(l.p); g.strokeStyle = 'rgba(217,180,91,.7)'; g.beginPath(); g.moveTo(L, y); g.lineTo(R, y); g.stroke(); const ty = Math.max(y - 3, ly + 11); ly = ty; g.fillStyle = 'rgba(217,180,91,.95)'; g.fillText('P' + l.k + ' ' + (l.p / 1000).toFixed(1) + 'k', R, ty); }
+  g.setLineDash([]);
+  g.strokeStyle = '#ebe8df'; g.lineWidth = 2.2; g.beginPath(); for (let t = 0; t <= H; t++) { const x = X(t), y = Y(p0 * stt.mid[t]); t ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+  g.strokeStyle = '#9ca3bb'; g.lineWidth = 1.8; g.beginPath(); for (let i = n - 1 - B0; i < n; i++) { const x = X(i - (n - 1)), y = Y(c[i]); i === n - 1 - B0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke();
+  g.strokeStyle = 'rgba(235,232,223,.35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(X(0), T); g.lineTo(X(0), Bt); g.stroke();
+  g.fillStyle = '#ebe8df'; g.beginPath(); g.arc(X(0), Y(p0), 3.5, 0, 7); g.fill();
+  g.fillStyle = '#9ca3bb'; g.textAlign = 'center'; for (const t of [0, 30, 60, 90]) g.fillText(t ? '+' + t + ' روز' : 'امروز', Math.min(R - 16, Math.max(L + 18, X(t))), Hh - 6);
 }
 function liqMap(liq) {
   const out = {};
@@ -263,7 +363,7 @@ function partsCard(S) {
   const c = S.c, n = c.length, p = c[n - 1], rp = window.__rp, sm = smaArr(c, 150)[n - 1];
   if (!rp) return '';
   const f = (x) => Math.round(x).toLocaleString('en-US');
-  const L = [[57356, 'فیبوناچی ۰٫۶۱۸ — «تصحیح کوچک» تو', 'پارت کوچک'], [rp, 'MVRV=۱ (قیمت خرید میانگین دارندگان)', 'پارت کوچک'], [rp * 0.8, 'MVRV=۰٫۸ (تنها نشانهٔ کف قوی در آزمون)', 'پارت اصلی'], [42000, 'محور ۴۲k تو', 'پارت اصلی'], [39068, 'فیبوناچی ۰٫۷۸۶', 'پارت اصلی'], [rp * 0.7, 'MVRV=۰٫۷ (کف‌های ۲۰۱۵ و ۲۰۱۸)', 'پارت اصلی']];
+  const L = ladderLevels().map((x) => [x.p, x.why, x.kind]);
   let rows = '', k = 1;
   for (const [lv, why, kind] of L) { const hit = p <= lv; rows += '<tr><th>' + (k++) + '</th><td>' + f(lv) + ' دلار</td><td>' + why + '</td><td style="color:' + (hit ? '#4cd08a' : '#9ca3bb') + '">' + (hit ? 'رسیده' : ('قیمت ' + ((p / lv - 1) * 100).toFixed(0) + '٪ بالاتر از آن')) + '</td></tr>'; }
   rows += '<tr><th>۷</th><td>' + f(sm) + ' دلار</td><td>ذخیره: فقط وقتی قیمت بالای میانگین ۱۵۰ روزه ببندد (تأیید روند)</td><td style="color:#9ca3bb">' + (((sm / p - 1) * 100).toFixed(0)) + '٪ بالاتر</td></tr>';
@@ -403,17 +503,18 @@ async function run() {
     // map of {l,s} objects: dayMap filters with isFinite, so rebuild liq explicitly
     aux.liq = {};
     for (const s of (liq && liq.data) || []) { const b = String(s.symbol).split(/USDT|USD/)[0]; const m = (aux.liq[b] = new Map()); for (const x of s.history || []) m.set(Math.floor(x.t / 86400), { l: +x.l, s: +x.s }); }
-    let html = '', btc = null;
-    { const SB = buildSeries('BTC', oh, price, todayDay); if (SB && SB.c.length >= 400 && window.Siren) Siren.update(sirenState(SB, aux)); }
+    let html = '', btc = null, btcSt = null, sirenSt = null;
+    { const SB = buildSeries('BTC', oh, price, todayDay); if (SB && SB.c.length >= 400) { sirenSt = sirenState(SB, aux); if (window.Siren) Siren.update(sirenSt); } }
     for (const sym of COINS) {
       const S = buildSeries(sym, oh, price, todayDay);
       if (!S || S.c.length < 400) { html += '<div class="card"><h2>' + sym + '</h2><div class="mut">داده کافی نیست.</div></div>'; continue; }
-      if (sym === 'BTC') btc = S;
-      html += coinCard(coinState(sym, S, aux));
+      const cs = coinState(sym, S, aux); if (sym === 'BTC') { btc = S; btcSt = cs; }
+      html += coinCard(cs);
     }
     html += BACKTEST;
-    if (btc) html += mvrvCard(btc, onch) + partsCard(btc) + swingCard(btc) + simCard();
-    $('out').innerHTML = html; drawSwing(); drawSim();
+    let cmd = '';
+    if (btc) { const mvh = mvrvCard(btc, onch); cmd = commandCard(btc, btcSt, sirenSt); html += mvh + partsCard(btc) + swingCard(btc) + simCard(); }
+    $('out').innerHTML = cmd + html; drawCommand(); drawSwing(); drawSim();
   } catch (e) { log('خطا: ' + e.message, 'dn'); }
   $('go').disabled = false;
 }

@@ -7,7 +7,11 @@
   const DPR = Math.min(window.devicePixelRatio || 1, 2), TAU = Math.PI * 2;
 
   const css = `
-#siren{margin:12px 0}
+#siren{margin:12px 0;display:none}
+.sn-mini{position:absolute;bottom:8px;inset-inline-start:8px;z-index:3;display:flex;gap:6px;opacity:.4;transition:opacity .3s}
+.sn-mini:hover,.sn-mini:active,.sn-mini:focus-within{opacity:1}
+.sn-mini button{background:rgba(5,8,6,.6);color:#cfc38a;border:1px solid rgba(120,130,105,.5);border-radius:8px;padding:3px 9px;font-size:11px;font-weight:600;font-family:Tahoma,system-ui,sans-serif}
+.sn-mini button.act{border-color:#d7c78a;color:#ffe9a3}
 .sn{position:relative;border-radius:14px;border:2px solid #3a4136;background:linear-gradient(#0d110e,#070907);padding:10px 12px 12px;overflow:hidden;font-family:ui-monospace,Menlo,Consolas,Tahoma,monospace;box-shadow:inset 0 0 0 1px #000,inset 0 2px 10px rgba(255,255,255,.04);transition:border-color .5s,box-shadow .5s}
 .sn::before{content:'';position:absolute;inset:4px;pointer-events:none;background:radial-gradient(circle,#7d8576 0 2px,transparent 2.7px) left top/10px 10px no-repeat,radial-gradient(circle,#7d8576 0 2px,transparent 2.7px) right top/10px 10px no-repeat,radial-gradient(circle,#7d8576 0 2px,transparent 2.7px) left bottom/10px 10px no-repeat,radial-gradient(circle,#7d8576 0 2px,transparent 2.7px) right bottom/10px 10px no-repeat}
 .sn::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.2) 0 1px,transparent 1px 3px)}
@@ -52,13 +56,15 @@ body.sn-alert::after{content:'';position:fixed;inset:0;pointer-events:none;z-ind
       </div></div>
     <ul class="sn-why" id="snwhy"></ul><div class="sn-note" id="snnote"></div>
   </div>
-  <div class="sn-btns"><button id="snsnd">صدا: خاموش</button><button id="sndemo">آزمایش آژیر</button></div>
 </div>`;
+  const heroEl = document.getElementById('hero'), mini = document.createElement('div');
+  mini.className = 'sn-mini'; mini.innerHTML = '<button id="snsnd">صدا: خاموش</button><button id="sndemo">آزمایش آژیر</button>'; (heroEl || host).appendChild(mini);
+  ['pointerdown', 'touchstart', 'mousedown'].forEach((ev) => mini.addEventListener(ev, (e) => e.stopPropagation()));
   const $ = (id) => document.getElementById(id), box = $('sn'), cv = $('snsc'), ctx = cv.getContext('2d'), S = 168;
   cv.width = S * DPR; cv.height = S * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   const SECT = { A: [.9, .66], B: [3.1, .46], C: [5.2, .78] };  // angle (rad), radius fraction of the blip per trigger
   const DEMO = { on: true, why: [{ t: 'A', day: 'آزمایشی', txt: 'نمونهٔ آزمایشی: شتاب' }, { t: 'C', day: 'آزمایشی', txt: 'نمونهٔ آزمایشی: افت ۷ روزه ۱۸٪' }], extra: '' };
-  let real = { on: false, why: [], extra: '' }, demo = /[?&]siren=test/.test(location.search), on = false, power = 0, raf = 0, last = 0, soundOn = false;
+  let real = { on: false, why: [], extra: '' }, demo = /[?&]siren=test/.test(location.search), on = false, power = 0, raf = 0, last = 0, soundOn = false, hideT = 0;
   const clutter = []; { let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647; for (let i = 0; i < 16; i++) clutter.push([r() * TAU, .15 + r() * .8]); }
 
   /* ---------- radar scope ---------- */
@@ -150,9 +156,10 @@ body.sn-alert::after{content:'';position:fixed;inset:0;pointer-events:none;z-ind
     $('snled').classList.toggle('lit', next);
     $('sndemo').textContent = demo ? 'پایان آزمایش' : 'آزمایش آژیر'; $('sndemo').classList.toggle('act', demo);
     if (next !== on) {
-      on = next; box.classList.toggle('on', on); document.body.classList.toggle('sn-alert', on);
+      on = next; clearTimeout(hideT); document.body.classList.toggle('sn-alert', on);
+      if (on) { host.style.display = 'block'; void host.offsetHeight; box.classList.add('on'); startLoop(); }
+      else { box.classList.remove('on'); hideT = setTimeout(() => { if (!on) host.style.display = 'none'; }, 1000); }
       if (window.Scene && Scene.setAlert) Scene.setAlert(on);
-      if (on) startLoop();
       if (soundOn) on ? Shofar.loop() : Shofar.stopLoop();
     }
   }
