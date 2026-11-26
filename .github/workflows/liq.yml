@@ -2,12 +2,13 @@ name: Update market data
 on:
   workflow_dispatch:
   schedule:
-    - cron: '17 */6 * * *'
+    - cron: '17 * * * *'
   push:
     paths:
       - '.github/workflows/liq.yml'
       - 'scripts/fetch.py'
       - 'scripts/whale.py'
+      - 'scripts/macro.py'
       - 'scripts/ledger.py'
 permissions:
   contents: write
@@ -20,6 +21,9 @@ jobs:
         env:
           KEY: 322170a1-8172-4349-83cd-7fca61183feb
         run: python3 scripts/fetch.py
+      - name: Macro liquidity
+        continue-on-error: true
+        run: python3 scripts/macro.py
       - name: Whale watch
         continue-on-error: true
         run: python3 scripts/whale.py
