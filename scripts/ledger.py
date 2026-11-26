@@ -97,6 +97,21 @@ def readings(day, C, D, liq, fund, lsr, ohl, whale, oi={}, usd={}):
     g['volatility'] = None if vo is None else (-1 if vo >= VOL_HI else (1 if vo <= VOL_LO else 0))
     vr = r['volume_ratio7_90']
     g['participation'] = None if vr is None else (-1 if vr <= VOLR_LO else 0)
+    # macro raw readings (recorded only, no vote: no macro series passed the split-half test, 2026-11-26)
+    import datetime
+    try:
+        M = load('macro.json')['series']
+        def mv(name, back):
+            dd = datetime.date.fromordinal(day + 719163 - back).isoformat(); v = None
+            for a, b in M.get(name, []):
+                if a <= dd: v = b
+                else: break
+            return v
+        for nm, key in [('stablecoins_bn', 'stable_chg30'), ('dollar_broad', 'dollar_chg30'), ('tga_bn', 'tga_chg30')]:
+            a, b = mv(nm, 0), mv(nm, 30); r[key] = (a / b - 1) if a and b else None
+        a, b = mv('us10y', 0), mv('us10y', 30); r['us10y_delta30'] = (a - b) if a is not None and b is not None else None
+    except Exception:
+        pass
     r['groups'] = g
     gs = [x for x in g.values() if x is not None]
     r['gscore'] = sum(gs) if gs else None

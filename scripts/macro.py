@@ -26,7 +26,7 @@ for sid, name in FRED.items():
                         try: pts.append([a[0], float(a[1])])
                         except Exception: pass
             if pts:
-                out['series'][name] = pts[-900:]; out['status'][name] = 'ok %s %d, last %s' % (kind, len(pts), pts[-1][0]); ok = True; break
+                out['series'][name] = pts[-2500:]; out['status'][name] = 'ok %s %d, last %s' % (kind, len(pts), pts[-1][0]); ok = True; break
         except Exception as e:
             out['status'][name] = 'FAILED %s %s' % (kind, e)
     fails = 0 if ok else fails + 1
@@ -68,14 +68,14 @@ with cf.ThreadPoolExecutor(6) as ex:
     for f in jobs:
         name, pts, st = f.result()
         out['status'][name] = st
-        if pts: out['series'][name] = pts[-900:]
+        if pts: out['series'][name] = pts[-2500:]
 try:
     j = json.loads(get('https://stablecoins.llama.fi/stablecoincharts/all'))
     pts = []
     for x in j:
         try: pts.append([time.strftime('%Y-%m-%d', time.gmtime(int(x['date']))), x['totalCirculatingUSD']['peggedUSD'] / 1e9])
         except Exception: pass
-    out['series']['stablecoins_bn'] = pts[-900:]
+    out['series']['stablecoins_bn'] = pts
     out['status']['stablecoins_bn'] = 'ok %d, last %s' % (len(pts), pts[-1][0] if pts else '-')
 except Exception as e:
     out['status']['stablecoins_bn'] = 'FAILED %s' % e
