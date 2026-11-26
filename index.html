@@ -336,6 +336,95 @@ function ledgerCard(L) {
     '<i>آستانه‌ها از همین تاریخ ساخته شدند، پس خوش‌بینانه‌اند؛ تعداد آزمون‌ها زیاد بود و روزهای همسایه مستقل نیستند. داوری نهایی با همین دفتر زنده است. «آژیر» و «شتاب» هم در گروه قیمت ثبت می‌شوند.</i></div></details></div>';
   return h;
 }
+// ---------- رادار: بیلان ساعتی (پالس ساعتی + روند + نقدینگی + اهرم) ----------
+function radarCard(SM, aux, oh1, lq1, macro, ohD, meta) {
+  const now = Math.floor(Date.now() / 1000), A = '▲', V = '▼', N = '■';
+  const sg = (x) => (x > 0 ? A : x < 0 ? V : N), col = (x) => (x > 0 ? 'color:#5fe0a0' : x < 0 ? 'color:#ff6b6b' : 'color:#e0c060');
+  const fx = (v, d) => (isFinite(v) ? (v >= 0 ? '+' : '') + (v * 100).toFixed(d == null ? 1 : d) + '٪' : '—');
+  // ----- ۱) پالس ساعتی -----
+  const hist = (J, sym) => { const s = ((J && J.data) || []).find((x) => String(x.symbol).startsWith(sym + 'USDT')); return s ? s.history : []; };
+  let pulse = '', lastHour = 0; const P = {};
+  for (const sym of COINS) {
+    const H = hist(oh1, sym).filter((x) => x.t + 3600 <= now); if (H.length < 200) continue;
+    const n = H.length, c = H[n - 1].c; lastHour = Math.max(lastHour, H[n - 1].t + 3600);
+    const ch = (k) => c / H[n - 1 - k].c - 1;
+    const L = hist(lq1, sym).filter((x) => x.t + 3600 <= now), l24 = L.slice(-24);
+    const ll = l24.reduce((a, x) => a + (+x.l || 0), 0), ls = l24.reduce((a, x) => a + (+x.s || 0), 0);
+    const w = H.slice(-24), tb = w.reduce((a, x) => a + (x.bv || 0), 0) / w.reduce((a, x) => a + (x.v || 0), 0);
+    const rr = (a) => a.slice(1).map((x, i) => Math.log(x.c / a[i].c)), sdv = (a) => { const m = a.reduce((p, q) => p + q, 0) / a.length; return Math.sqrt(a.reduce((p, q) => p + (q - m) * (q - m), 0) / (a.length - 1)); };
+    const v24 = sdv(rr(H.slice(-25))), v30 = sdv(rr(H.slice(-721)));
+    P[sym] = { c, h1: ch(1), h24: ch(24), d7: ch(168), ll, ls, tb, vr: v24 / v30 };
+    pulse += '<tr><td><b>' + sym + '</b></td><td>' + (c >= 100 ? Math.round(c).toLocaleString('en') : c.toFixed(3)) + '</td><td style="' + col(P[sym].h1) + '">' + fx(P[sym].h1) + '</td><td style="' + col(P[sym].h24) + '">' + fx(P[sym].h24) + '</td><td style="' + col(P[sym].d7) + '">' + fx(P[sym].d7) + '</td><td>' + usd(ll) + ' / ' + usd(ls) + '</td><td>' + pct(tb) + '</td><td>' + P[sym].vr.toFixed(1) + '×</td></tr>';
+  }
+  // ----- ۲) روند و تغییر روند (روزانه) -----
+  const T = {}; let trend = '';
+  for (const sym of COINS) {
+    const S = SM[sym]; if (!S || S.c.length < 200) continue;
+    const c = S.c, n = c.length, s21 = smaArr(c, 21), s150 = smaArr(c, 150), p = c[n - 1];
+    const a150 = p >= s150[n - 1], a21 = p >= s21[n - 1]; let cross = 0; for (let i = n - 1; i > n - 120; i--) { if ((c[i] >= s21[i]) !== a21) break; cross++; }
+    const mx = (a, b) => Math.max.apply(null, c.slice(n - b, n - a)), mn = (a, b) => Math.min.apply(null, c.slice(n - b, n - a));
+    const lowerHigh = mx(0, 30) < mx(30, 60), lowerLow = mn(0, 30) < mn(30, 60), higherHigh = !lowerHigh, higherLow = !lowerLow;
+    const struct = lowerHigh && lowerLow ? ['v', 'سقف و کف پایین‌تر'] : higherHigh && higherLow ? ['a', 'سقف و کف بالاتر'] : ['n', 'ساختار مخلوط'];
+    const reg = a150 && a21 ? ['صعودی', 1] : a150 ? ['صعودی، در اصلاح', 0] : a21 ? ['تلاش برای تغییر روند', 0] : ['نزولی', -1];
+    T[sym] = { reg, struct, a150, a21, cross, dist: p / s150[n - 1] - 1, slope: s21[n - 1] / s21[n - 6] - 1 };
+    trend += '<tr><td><b>' + sym + '</b></td><td style="' + col(reg[1]) + '"><b>' + reg[0] + '</b></td><td>' + fx(T[sym].dist, 0) + '</td><td>' + (a21 ? 'بالای' : 'زیر') + ' ۲۱ روزه از ' + cross + ' روز پیش</td><td>' + fx(T[sym].slope) + '</td><td>' + struct[1] + '</td></tr>';
+  }
+  // ----- ۳) نقدینگی -----
+  const MS = (macro && macro.series) || {}, rows = [];
+  const valAt = (arr, ds) => { let v = null; for (const q of arr || []) { if (q[0] <= ds) v = q[1]; else break; } return v; };
+  const dAgo = (ds, k) => new Date(Date.parse(ds) - k * 86400000).toISOString().slice(0, 10);
+  const chg = (arr, k) => { if (!arr || !arr.length) return NaN; const e = arr[arr.length - 1], a = valAt(arr, dAgo(e[0], k)); return a ? e[1] / a - 1 : NaN; };
+  const age = (arr) => (arr && arr.length ? Math.floor((now - Date.parse(arr[arr.length - 1][0]) / 1000) / 86400) : null);
+  const liq = [];
+  const sc = MS.stablecoins_bn;
+  if (sc && sc.length) { const c30 = chg(sc, 30), c90 = chg(sc, 90); liq.push({ n: 'استیبل‌کوین‌ها (باروتِ آمادهٔ خرید)', v: Math.round(sc[sc.length - 1][1]) + ' میلیارد$', c30, c90, s: c30 >= .01 ? 1 : c30 <= -.01 ? -1 : 0, age: age(sc), note: 'رشد = پول تازه آمادهٔ ورود؛ افت = خروج نقدینگی' }); }
+  const WA = MS.fed_balance_sheet_mn, TG = MS.tga_bn, RR = MS.reverse_repo_bn;
+  if (WA && TG && RR && WA.length && TG.length && RR.length) {
+    const tn = TG[TG.length - 1][1] > 5000 ? 0.001 : 1, net = (ds) => { const a = valAt(WA, ds), b = valAt(TG, ds), r = valAt(RR, ds); return a != null && b != null && r != null ? a / 1000 - b * tn - r : null; };
+    const e = WA[WA.length - 1][0], n0 = net(e), n30 = net(dAgo(e, 30)), n90 = net(dAgo(e, 90));
+    if (n0 && n30 && n90) liq.push({ n: 'نقدینگی خالص فدرال (ترازنامه − خزانه − ریپوی معکوس)', v: Math.round(n0) + ' میلیارد$', c30: n0 / n30 - 1, c90: n0 / n90 - 1, s: n0 / n30 - 1 >= .01 ? 1 : n0 / n30 - 1 <= -.01 ? -1 : 0, age: age(WA), note: 'سنجهٔ کلاسیکِ نقدینگی دلار؛ رشد معمولاً به نفع دارایی‌های ریسکی' });
+  }
+  const DX = MS.dollar_broad; if (DX && DX.length) { const c30 = chg(DX, 30); liq.push({ n: 'شاخص دلار (گسترده)', v: DX[DX.length - 1][1].toFixed(1), c30, c90: chg(DX, 90), s: c30 >= .01 ? -1 : c30 <= -.01 ? 1 : 0, age: age(DX), note: 'دلار قوی‌تر = فشار بر دارایی ریسکی (قاعدهٔ کلاسیک؛ اینجا آزموده نشده)' }); }
+  const Y10 = MS.us10y; if (Y10 && Y10.length) { const e = Y10[Y10.length - 1][1], a = valAt(Y10, dAgo(Y10[Y10.length - 1][0], 30)); liq.push({ n: 'بازده اوراق ۱۰ ساله آمریکا', v: e.toFixed(2) + '٪', c30: a != null ? (e - a) / 100 : NaN, c90: NaN, s: a != null ? (e - a >= .25 ? -1 : e - a <= -.25 ? 1 : 0) : 0, age: age(Y10), note: 'افزایش بازده = فشار بر دارایی ریسکی (قاعدهٔ کلاسیک؛ آزموده نشده)', abs: true }); }
+  let liqHtml = liq.map((x) => '<tr><td>' + x.n + '</td><td>' + x.v + '</td><td style="' + col(x.s) + '">' + (x.abs ? (isFinite(x.c30) ? (x.c30 * 100 >= 0 ? '+' : '') + (x.c30 * 100).toFixed(2) + ' واحد' : '—') : fx(x.c30)) + '</td><td>' + (x.abs ? '—' : fx(x.c90)) + '</td><td style="' + col(x.s) + '">' + sg(x.s) + '</td><td class="mut">' + (x.age > 6 ? 'قدیمی: ' + x.age + ' روز' : 'تازه') + '</td></tr>').join('');
+  const fredMissing = !(WA && TG && RR) || !DX || !Y10;
+  // ----- ۴) اهرم / نوسان / مشارکت (BTC) -----
+  const SB = SM.BTC, bs = [];
+  const bal = [];  // [عامل، علامت، توضیح، آزموده؟]
+  if (T.BTC) {
+    bal.push(['روند BTC', T.BTC.reg[1], T.BTC.reg[0] + ' (' + fx(T.BTC.dist, 0) + ' نسبت به میانگین ۱۵۰)', 'آزموده ✔']);
+    bal.push(['ساختار قیمت', T.BTC.struct[0] === 'a' ? 1 : T.BTC.struct[0] === 'v' ? -1 : 0, T.BTC.struct[1] + ' در ۳۰ روز اخیر نسبت به ۳۰ روز پیشِ آن', 'آزموده نشده']);
+  }
+  for (const x of liq) bal.push([x.n.split(' (')[0], x.s, x.v + '؛ ۳۰ روز ' + (x.abs ? '' : fx(x.c30)), x.n.startsWith('استیبل') ? 'جهتِ اثر وابسته به روند' : 'آزموده نشده']);
+  if (SB) {
+    const ed = SB.d[SB.c.length - 1], fund = lastMean(aux.fund.BTC, ed, 7), lsr = lastMean(aux.lsr.BTC, ed, 1);
+    let lev = 0, lt = []; if (isFinite(fund)) { lev += fund >= 0.0094763 ? -1 : fund <= 0.0045749 ? 1 : 0; lt.push('فاندینگ ' + fund.toFixed(4)); } if (isFinite(lsr)) { lev += lsr >= 64.63 ? -1 : lsr <= 54.64 ? 1 : 0; lt.push('لانگ‌ها ' + lsr.toFixed(0) + '٪ حساب‌ها'); }
+    bal.push(['اهرم و شلوغی', lev > 0 ? 1 : lev < 0 ? -1 : 0, lt.join('، ') || 'داده نیست', 'آزموده ✔ (گذشته‌نگر)']);
+    const c = SB.c, n = c.length, rr = c.slice(n - 30).map((x, i) => Math.log(x / c[n - 31 + i])), m = rr.reduce((a, b) => a + b, 0) / 30, vo = Math.sqrt(rr.reduce((a, b) => a + (b - m) * (b - m), 0) / 29);
+    bal.push(['نوسان ۳۰ روزه', vo >= 0.0369433 ? -1 : vo <= 0.0245326 ? 1 : 0, 'نوسان روزانه ' + (vo * 100).toFixed(1) + '٪', 'آزموده ✔ (گذشته‌نگر)']);
+    const BH = ((ohD && ohD.data) || []).find((x) => String(x.symbol).startsWith('BTCUSDT'));
+    if (BH) { const h = BH.history.filter((x) => Math.floor(x.t / 86400) < Math.floor(now / 86400)), v7 = h.slice(-7).reduce((a, x) => a + x.v, 0) / 7, v90 = h.slice(-90).reduce((a, x) => a + x.v, 0) / 90; bal.push(['مشارکت (حجم)', v7 / v90 <= 0.835994 ? -1 : 0, 'حجم ۷ روز = ' + (v7 / v90).toFixed(2) + '× میانگین ۹۰ روز', 'آزموده ✔ (گذشته‌نگر)']); }
+  }
+  if (P.BTC) bal.push(['پالس ۲۴ ساعت', P.BTC.h24 <= -0.05 ? -1 : P.BTC.h24 >= 0.05 ? 1 : 0, fx(P.BTC.h24) + '؛ لیکوییدِ لانگ/شورت ' + usd(P.BTC.ll) + ' / ' + usd(P.BTC.ls), 'وضعیت، نه پیش‌بینی']);
+  const up = bal.filter((x) => x[1] > 0).length, dn = bal.filter((x) => x[1] < 0).length, ne = bal.length - up - dn;
+  const balRows = bal.map((x) => '<tr><td>' + x[0] + '</td><td style="' + col(x[1]) + ';font-size:1.2em">' + sg(x[1]) + '</td><td>' + x[2] + '</td><td class="mut">' + x[3] + '</td></tr>').join('');
+  // ----- متن رادار -----
+  const B = T.BTC, txt = [];
+  if (B) txt.push('BTC ' + B.reg[0] + ' است و ' + (B.a150 ? 'بالای' : 'زیر') + ' میانگین ۱۵۰ روزه؛ ' + (B.a21 ? 'بالای' : 'زیر') + ' میانگین ۲۱ روزه از ' + B.cross + ' روز پیش. ' + (!B.a150 && B.a21 ? 'این یعنی بازار دارد تلاش می‌کند روند را عوض کند، ولی تا بسته‌شدن بالای ۱۵۰ روزه تأییدی نیست. ' : B.a150 || B.a21 ? '' : 'هنوز نشانه‌ای از تغییر روند نیست. '));
+  const stab = liq.find((x) => x.n.startsWith('استیبل')); if (stab) txt.push('نقدینگی استیبل‌کوین‌ها در ۳۰ روز ' + fx(stab.c30) + ' ' + (stab.s < 0 ? '(خروج پول از بازار)' : stab.s > 0 ? '(ورود پول تازه)' : '(تقریباً ثابت)') + '.');
+  if (P.BTC) txt.push('در ۲۴ ساعت گذشته BTC ' + fx(P.BTC.h24) + ' و ' + (P.BTC.ll > P.BTC.ls ? 'فشار لیکویید بیشتر روی لانگ‌ها' : 'فشار لیکویید بیشتر روی شورت‌ها') + ' بود.');
+  txt.push('از ' + bal.length + ' عامل: ' + up + ' حامی، ' + dn + ' فشار، ' + ne + ' خنثی.');
+  const stamp = lastHour ? new Date(lastHour * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : '—';
+  return '<div class="card"><h2>رادار — بیلان ساعتی</h2>' +
+    '<div class="verdict ' + (dn > up + 1 ? 'v-r' : up > dn + 1 ? 'v-g' : 'v-y') + '">' + txt.join(' ') + '</div>' +
+    '<div class="mut" style="margin-top:4px">آخرین ساعتِ بسته‌شده: ' + stamp + ' · داده هر ساعت از مخزن تازه می‌شود (صفحه هر ۱۵ دقیقه دوباره می‌خواند).</div>' +
+    '<h3 style="margin:10px 0 4px">بیلان عامل‌ها</h3><div class="tw"><table><tr><th>عامل</th><th></th><th>وضعیت</th><th>اعتبار</th></tr>' + balRows + '</table></div>' +
+    '<h3 style="margin:10px 0 4px">پالس ساعتی</h3><div class="tw"><table><tr><th>ارز</th><th>قیمت</th><th>۱ ساعت</th><th>۲۴ ساعت</th><th>۷ روز</th><th>لیکوید ۲۴س لانگ/شورت</th><th>خرید تهاجمی</th><th>نوسان نسبت به معمول</th></tr>' + pulse + '</table></div>' +
+    '<h3 style="margin:10px 0 4px">روند و تغییر روند</h3><div class="tw"><table><tr><th>ارز</th><th>رژیم</th><th>فاصله از ۱۵۰</th><th>نسبت به ۲۱ روزه</th><th>شیب ۲۱ روزه (۵ روز)</th><th>ساختار</th></tr>' + trend + '</table></div>' +
+    '<h3 style="margin:10px 0 4px">نقدینگی</h3>' + (liqHtml ? '<div class="tw"><table><tr><th>شاخص</th><th>اکنون</th><th>۳۰ روز</th><th>۹۰ روز</th><th></th><th>تازگی</th></tr>' + liqHtml + '</table></div>' : '') +
+    (fredMissing ? '<div class="mut" style="margin-top:4px">بخشی از دادهٔ نقدینگی کلان (ترازنامهٔ فدرال، دلار، بازده ۱۰ ساله) هنوز از منبع رایگانش نیامده؛ تا نیاید نشان داده نمی‌شود و حدس نمی‌زنم.</div>' : '') +
+    '<div class="mut" style="margin-top:8px"><b>صادقانه:</b> فقط عامل‌های «آزموده ✔» در گذشتهٔ BTC سنجیده شده‌اند (و آستانه‌هایشان درون‌نمونه‌ای است)؛ نقدینگی کلان و دلار قاعدهٔ کلاسیکند و اینجا هنوز آزموده نشده‌اند. این بیلان وضعیت را می‌خواند، سفارش نمی‌دهد؛ تصمیم‌گیر همچنان «فرمان» است.</div></div>';
+}
 // ---------- فرمان: مشابه‌یاب تاریخی + مغز تصمیم ----------
 function sirenFlags(c) {  // سه شرط آژیر برای هر روز (بدون نگاه به آینده)
   const n = c.length, sm = smaArr(c, 150), rr = c.map((x, i) => (i ? Math.log(x / c[i - 1]) : NaN)), vs = stdRoll(rr, 30);
@@ -604,7 +693,7 @@ async function run() {
   $('go').disabled = true; $('log').innerHTML = ''; $('out').innerHTML = '';
   try {
     const q = '?ts=' + Date.now();
-    const whP = getJSON('./whale.json' + q).catch(() => null), ldP = getJSON('./ledger.json' + q).catch(() => null);
+    const whP = getJSON('./whale.json' + q).catch(() => null), ldP = getJSON('./ledger.json' + q).catch(() => null), h1P = getJSON('./ohlcv1h.json' + q).catch(() => null), l1P = getJSON('./liq1h.json' + q).catch(() => null), mcP = getJSON('./macro.json' + q).catch(() => null);
     const [meta, oh, liq, oi, fu, ls, price, onch] = await Promise.all(['meta', 'ohlcv', 'liq', 'oi', 'funding', 'lsr', 'price', 'onchain'].map((f) => getJSON('./' + f + '.json' + q).catch((e) => { log('نیامد: ' + f, 'dn'); return null; })));
     if (!oh) throw new Error('داده قیمت هنوز در مخزن نیست');
     log('داده به‌روز شده: ' + new Date(meta.fetched * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC');
@@ -627,7 +716,8 @@ async function run() {
     html += BACKTEST;
     let cmd = '';
     if (btc) { const mvh = mvrvCard(btc, onch); cmd = commandCard(btc, btcSt, sirenSt); html += mvh + partsCard(btc) + swingCard(btc) + simCard(); }
-    $('out').innerHTML = cmd + whoLostCard(SM, aux) + whaleCard(oh, onch, await whP) + ledgerCard(await ldP) + html; drawCommand(); drawSwing(); drawSim();
+    let radar = ''; try { radar = radarCard(SM, aux, await h1P, await l1P, await mcP, oh, meta); } catch (e) { radar = '<div class="card"><h2>رادار</h2><div class="mut">خطا: ' + e.message + '</div></div>'; }
+    $('out').innerHTML = radar + cmd + whoLostCard(SM, aux) + whaleCard(oh, onch, await whP) + ledgerCard(await ldP) + html; drawCommand(); drawSwing(); drawSim();
   } catch (e) { log('خطا: ' + e.message, 'dn'); }
   $('go').disabled = false;
 }
