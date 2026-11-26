@@ -309,6 +309,31 @@ function whaleCard(oh, onch, wh) {
   out += '<div class="mut" style="margin-top:8px"><b>آزمون صادقانه:</b> جریان صرافی به‌تنهایی کمی گرایش نشان داد ولی روی قانون روند (میانگین ۱۵۰) چیزی اضافه نکرد؛ سهم خرید تهاجمی هم در داده‌ها رابطهٔ پایداری با ۳۰ روز بعد نداشت. بنابراین این کارت فقط «وضعیت» نشان می‌دهد و در فرمان رأی ندارد. ردیابی واقعی نهنگ‌ها (کیف‌پول‌های بزرگ، ورود USDT به صرافی) منبع پولی می‌خواهد (CryptoQuant/Glassnode)؛ منبع رایگانی که پیدا کردم بعد از مه ۲۰۲۶ مرده است.</div></div>';
   return out;
 }
+// ---------- دفتر ثبت زنده: آزمون واقعی اتحاد اندیکاتورها ----------
+function ledgerCard(L) {
+  const R = (L && L.rows) || [];
+  let h = '<div class="card"><h2>دفتر ثبت زنده — آزمون واقعی</h2>';
+  if (!R.length) return h + '<div class="mut">هنوز اولین ثبت انجام نشده (بعد از اولین اجرای اکشنز پر می‌شود).</div></div>';
+  const vt = (v) => (v == null ? '—' : v > 0 ? '▲' : v < 0 ? '▼' : '■'), day = (r) => dstr(r.day * 86400), f = (v) => (v == null ? '—' : pct(v));
+  const last = R[R.length - 1], v = last.votes || {};
+  h += '<div style="margin-top:6px">هر روز، خواندنِ اندیکاتورها همان‌طور که هست <b>منجمد</b> می‌شود و بعدها با قیمت واقعی مقایسه می‌شود. تا امروز <b>' + R.length + '</b> روز ثبت شده (از ' + day(R[0]) + ').</div>';
+  h += '<div class="verdict ' + (last.score <= -2 ? 'v-r' : last.score >= 1 ? 'v-g' : 'v-y') + '" style="margin-top:8px">آخرین ثبت (' + day(last) + '): روند ' + vt(v.trend) + ' · آژیر ' + vt(v.siren) + ' · شتاب ۳۰ روزه ' + vt(v.momentum) + ' → مجموع رأی‌ها ' + last.score + ' (▲ نگه‌داشتن، ▼ هشدار). سهم لانگِ لیکویید ' + f(last.liq_long_share30) + '، کیف‌پول‌های سرد صرافی ' + (last.whale_cold_total ? Math.round(last.whale_cold_total).toLocaleString('en') + ' BTC' : '—') + ' (فقط ثبت می‌شود، رأی ندارد).</div>';
+  h += '<div class="tw" style="margin-top:8px"><table><tr><th>روز</th><th>قیمت</th><th>رأی</th><th>۷ روز بعد</th><th>۳۰ روز بعد</th><th>۹۰ روز بعد</th></tr>' +
+    R.slice(-8).reverse().map((r) => '<tr><td>' + day(r) + '</td><td>' + Math.round(r.close).toLocaleString('en') + '</td><td>' + (r.score == null ? '—' : r.score) + '</td><td>' + f(r.fwd7) + '</td><td>' + f(r.fwd30) + '</td><td>' + f(r.fwd90) + '</td></tr>').join('') + '</table></div>';
+  const M = R.filter((r) => r.fwd30 != null && r.score != null);
+  if (M.length >= 20) {
+    const med = (a) => { a = a.slice().sort((x, y) => x - y); return a[Math.floor(a.length / 2)]; }, w = M.filter((r) => r.score < 0), g = M.filter((r) => r.score >= 0);
+    h += '<div style="margin-top:8px"><b>نتیجهٔ زنده تا امروز (' + M.length + ' روز رسیده):</b> رأی منفی (' + w.length + ' روز): میانهٔ ۳۰ روز بعد ' + (w.length ? pct(med(w.map((r) => r.fwd30))) : '—') + '؛ رأی غیرمنفی (' + g.length + ' روز): ' + (g.length ? pct(med(g.map((r) => r.fwd30))) : '—') + '.</div>';
+  } else h += '<div class="mut" style="margin-top:8px">نتیجهٔ زنده بعد از ۲۰ روزِ رسیده (حدود ۵۰ روز از شروع) نشان داده می‌شود؛ تا آن موقع عددی از خودم نمی‌سازم.</div>';
+  h += '<details style="margin-top:8px"><summary><b>آزمون گذشته‌نگر اتحاد اندیکاتورها (BTC، ۲۰۱۳ تا ۲۰۲۶، همان داده‌های واقعی)</b></summary><div class="mut" style="margin-top:6px">' +
+    '• گروه‌ها مستقل نیستند: همبستگی روند↔شتاب ۰٫۴۸ و شتاب↔سهم لانگ لیکویید ۰٫۶۵. چند اندیکاتور همسو = یک خبر تکراری، نه چند تأیید.<br>' +
+    '• روند: بالای میانگین ۱۵۰ → میانهٔ ۹۰ روز بعد +۱۷٪؛ زیر آن +۲٪.<br>' +
+    '• تنها ترکیب با اثر روشن: بالای میانگین ۱۵۰ ولی افت ۳۰ روزه ≥۱۵٪ (۲۰۳ روز، چند دوره): ۶۷٪ احتمال افت ۲۰٪ در ۹۰ روز و میانه −۱۲٪؛ همان منطق شاخهٔ C آژیر.<br>' +
+    '• سهم لانگ لیکویید ≥۶۵٪ <b>خلاف انتظار</b> بود: بعد از فروش اجباریِ یک‌طرفه معمولاً بازگشت آمد (فقط ۳ دوره؛ مدرک ضعیف). به همین دلیل رأیی به آن نداده‌ام و فقط ثبت می‌شود.<br>' +
+    '• جمع‌زدن رأی‌ها چیزی بهتر از «روند به‌تنهایی» نداد. بنابراین مغز فرمان هنوز همان قانون روند است و نمرهٔ واحد فقط برای آزمون زنده ثبت می‌شود.<br>' +
+    '<i>این‌ها گذشته‌نگرند و نمونه‌شان کم است؛ داوری نهایی با همین دفتر زنده است.</i></div></details></div>';
+  return h;
+}
 // ---------- فرمان: مشابه‌یاب تاریخی + مغز تصمیم ----------
 function sirenFlags(c) {  // سه شرط آژیر برای هر روز (بدون نگاه به آینده)
   const n = c.length, sm = smaArr(c, 150), rr = c.map((x, i) => (i ? Math.log(x / c[i - 1]) : NaN)), vs = stdRoll(rr, 30);
@@ -577,7 +602,7 @@ async function run() {
   $('go').disabled = true; $('log').innerHTML = ''; $('out').innerHTML = '';
   try {
     const q = '?ts=' + Date.now();
-    const whP = getJSON('./whale.json' + q).catch(() => null);
+    const whP = getJSON('./whale.json' + q).catch(() => null), ldP = getJSON('./ledger.json' + q).catch(() => null);
     const [meta, oh, liq, oi, fu, ls, price, onch] = await Promise.all(['meta', 'ohlcv', 'liq', 'oi', 'funding', 'lsr', 'price', 'onchain'].map((f) => getJSON('./' + f + '.json' + q).catch((e) => { log('نیامد: ' + f, 'dn'); return null; })));
     if (!oh) throw new Error('داده قیمت هنوز در مخزن نیست');
     log('داده به‌روز شده: ' + new Date(meta.fetched * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC');
@@ -600,7 +625,7 @@ async function run() {
     html += BACKTEST;
     let cmd = '';
     if (btc) { const mvh = mvrvCard(btc, onch); cmd = commandCard(btc, btcSt, sirenSt); html += mvh + partsCard(btc) + swingCard(btc) + simCard(); }
-    $('out').innerHTML = cmd + whoLostCard(SM, aux) + whaleCard(oh, onch, await whP) + html; drawCommand(); drawSwing(); drawSim();
+    $('out').innerHTML = cmd + whoLostCard(SM, aux) + whaleCard(oh, onch, await whP) + ledgerCard(await ldP) + html; drawCommand(); drawSwing(); drawSim();
   } catch (e) { log('خطا: ' + e.message, 'dn'); }
   $('go').disabled = false;
 }

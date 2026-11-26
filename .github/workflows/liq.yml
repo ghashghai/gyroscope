@@ -8,6 +8,7 @@ on:
       - '.github/workflows/liq.yml'
       - 'scripts/fetch.py'
       - 'scripts/whale.py'
+      - 'scripts/ledger.py'
 permissions:
   contents: write
 jobs:
@@ -22,6 +23,9 @@ jobs:
       - name: Whale watch
         continue-on-error: true
         run: python3 scripts/whale.py
+      - name: Ledger
+        continue-on-error: true
+        run: python3 scripts/ledger.py
       - name: Commit
         run: |
           git config user.name "github-actions"
