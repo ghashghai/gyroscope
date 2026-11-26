@@ -384,10 +384,14 @@ function radarCard(SM, aux, oh1, lq1, macro, ohD, meta) {
     const e = WA[WA.length - 1][0], n0 = net(e), n30 = net(dAgo(e, 30)), n90 = net(dAgo(e, 90));
     if (n0 && n30 && n90) liq.push({ n: 'نقدینگی خالص فدرال (ترازنامه − خزانه − ریپوی معکوس)', v: Math.round(n0) + ' میلیارد$', c30: n0 / n30 - 1, c90: n0 / n90 - 1, s: n0 / n30 - 1 >= .01 ? 1 : n0 / n30 - 1 <= -.01 ? -1 : 0, age: age(WA), note: 'سنجهٔ کلاسیکِ نقدینگی دلار؛ رشد معمولاً به نفع دارایی‌های ریسکی' });
   }
+  if (!(WA && WA.length)) {
+    if (TG && TG.length) { const e = TG[TG.length - 1][1], c30 = chg(TG, 30); liq.push({ n: 'حساب خزانهٔ آمریکا (TGA؛ هرچه بالاتر، پول بیشتر از بازار کشیده)', v: Math.round(e) + ' میلیارد$', c30, c90: chg(TG, 90), s: c30 >= .1 ? -1 : c30 <= -.1 ? 1 : 0, age: age(TG), note: 'قاعدهٔ کلاسیک؛ آزموده نشده' }); }
+    if (RR && RR.length) { const e = RR[RR.length - 1][1], c30 = chg(RR, 30); liq.push({ n: 'ریپوی معکوس فدرال (RRP؛ افت = پولِ پارک‌شده به بازار برمی‌گردد)', v: Math.round(e) + ' میلیارد$', c30, c90: chg(RR, 90), s: c30 <= -.1 ? 1 : c30 >= .1 ? -1 : 0, age: age(RR), note: 'قاعدهٔ کلاسیک؛ آزموده نشده' }); }
+  }
   const DX = MS.dollar_broad; if (DX && DX.length) { const c30 = chg(DX, 30); liq.push({ n: 'شاخص دلار (گسترده)', v: DX[DX.length - 1][1].toFixed(1), c30, c90: chg(DX, 90), s: c30 >= .01 ? -1 : c30 <= -.01 ? 1 : 0, age: age(DX), note: 'دلار قوی‌تر = فشار بر دارایی ریسکی (قاعدهٔ کلاسیک؛ اینجا آزموده نشده)' }); }
   const Y10 = MS.us10y; if (Y10 && Y10.length) { const e = Y10[Y10.length - 1][1], a = valAt(Y10, dAgo(Y10[Y10.length - 1][0], 30)); liq.push({ n: 'بازده اوراق ۱۰ ساله آمریکا', v: e.toFixed(2) + '٪', c30: a != null ? (e - a) / 100 : NaN, c90: NaN, s: a != null ? (e - a >= .25 ? -1 : e - a <= -.25 ? 1 : 0) : 0, age: age(Y10), note: 'افزایش بازده = فشار بر دارایی ریسکی (قاعدهٔ کلاسیک؛ آزموده نشده)', abs: true }); }
   let liqHtml = liq.map((x) => '<tr><td>' + x.n + '</td><td>' + x.v + '</td><td style="' + col(x.s) + '">' + (x.abs ? (isFinite(x.c30) ? (x.c30 * 100 >= 0 ? '+' : '') + (x.c30 * 100).toFixed(2) + ' واحد' : '—') : fx(x.c30)) + '</td><td>' + (x.abs ? '—' : fx(x.c90)) + '</td><td style="' + col(x.s) + '">' + sg(x.s) + '</td><td class="mut">' + (x.age > 6 ? 'قدیمی: ' + x.age + ' روز' : 'تازه') + '</td></tr>').join('');
-  const fredMissing = !(WA && TG && RR) || !DX || !Y10;
+  const fredMissing = !(WA && WA.length);
   // ----- ۴) اهرم / نوسان / مشارکت (BTC) -----
   const SB = SM.BTC, bs = [];
   const bal = [];  // [عامل، علامت، توضیح، آزموده؟]
@@ -422,7 +426,7 @@ function radarCard(SM, aux, oh1, lq1, macro, ohD, meta) {
     '<h3 style="margin:10px 0 4px">پالس ساعتی</h3><div class="tw"><table><tr><th>ارز</th><th>قیمت</th><th>۱ ساعت</th><th>۲۴ ساعت</th><th>۷ روز</th><th>لیکوید ۲۴س لانگ/شورت</th><th>خرید تهاجمی</th><th>نوسان نسبت به معمول</th></tr>' + pulse + '</table></div>' +
     '<h3 style="margin:10px 0 4px">روند و تغییر روند</h3><div class="tw"><table><tr><th>ارز</th><th>رژیم</th><th>فاصله از ۱۵۰</th><th>نسبت به ۲۱ روزه</th><th>شیب ۲۱ روزه (۵ روز)</th><th>ساختار</th></tr>' + trend + '</table></div>' +
     '<h3 style="margin:10px 0 4px">نقدینگی</h3>' + (liqHtml ? '<div class="tw"><table><tr><th>شاخص</th><th>اکنون</th><th>۳۰ روز</th><th>۹۰ روز</th><th></th><th>تازگی</th></tr>' + liqHtml + '</table></div>' : '') +
-    (fredMissing ? '<div class="mut" style="margin-top:4px">بخشی از دادهٔ نقدینگی کلان (ترازنامهٔ فدرال، دلار، بازده ۱۰ ساله) هنوز از منبع رایگانش نیامده؛ تا نیاید نشان داده نمی‌شود و حدس نمی‌زنم.</div>' : '') +
+    (fredMissing ? '<div class="mut" style="margin-top:4px">ترازنامهٔ کل فدرال (برای «نقدینگی خالص») از منبع رایگانش نیامد؛ به‌جایش دو جزء آن، TGA و RRP، جدا نشان داده می‌شوند. عدد ساختگی نمی‌گذارم.</div>' : '') +
     '<div class="mut" style="margin-top:8px"><b>صادقانه:</b> فقط عامل‌های «آزموده ✔» در گذشتهٔ BTC سنجیده شده‌اند (و آستانه‌هایشان درون‌نمونه‌ای است)؛ نقدینگی کلان و دلار قاعدهٔ کلاسیکند و اینجا هنوز آزموده نشده‌اند. این بیلان وضعیت را می‌خواند، سفارش نمی‌دهد؛ تصمیم‌گیر همچنان «فرمان» است.</div></div>';
 }
 // ---------- فرمان: مشابه‌یاب تاریخی + مغز تصمیم ----------
