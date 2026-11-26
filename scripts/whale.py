@@ -4,7 +4,6 @@ import json, time, urllib.request, os
 WALLETS = [
     ('Binance (cold 1)', '34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo'),
     ('Binance (cold 2)', '3JZq4atUahhuA9rLhXLMhhTo133J9rF97j'),
-    ('Binance (cold 3)', 'bc1qm34lsc65zpw79lxes69zkqmk6ee3ewf0j77s3h'),
     ('Bitfinex (cold)', 'bc1qgdjqv0av3q56jvd82tkdjpy7gdp9ut8tlqmgrpmv24sq90ecnvqqjwvw97'),
 ]
 def get(url):
