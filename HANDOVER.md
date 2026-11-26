@@ -41,6 +41,12 @@ Owner: Persian speaker, phone only, wants slow step-by-step guidance, copyable t
 - Honest reading printed in the card: it is a result of the fall, not a cause; it says nothing about asset quality; it is share of liquidated money, not percent of losing people. Backtest (BTC, 8 episodes with 30d long share >=62%, since 2022): further >10% drop within 30d in 62% vs 50% for any 15%-sell-off and 22% on a normal day -> no information beyond "market is already falling"; 90d later up in 6 of 7, same as other sell-offs. Pooled 4 coins: flush days (>=3x avg, price down, >=80% longs) gave no consistent edge. So the radar shows it as a status read, not a buy/sell signal.
 - Symmetric by design: in an uptrend the same card will show shorts being squeezed (share <= 45% -> green verdict).
 
+## Whales + glossary (2026-11-26)
+- `whaleCard(oh, onch)` in index.html (third card, after who-lost). CoinMetrics community btc.csv (price.json/onchain.json) STOPPED updating on 2026-05-23 -> exchange flow is stale; card says so and shows the May 30d net flow only as history. Shell here cannot reach raw.githubusercontent (proxy 403); Actions can.
+- Live proxy only: BTC futures avg trade size (v/tx) and taker-buy share (bv/v), 7d, percentile vs history. In-sample check: taker-buy share terciles gave no consistent 30d edge. No vote in the command brain.
+- Real whale tracking (big wallets, exchange USDT inflow) needs paid CryptoQuant/Glassnode. Free alternative untested: other on-chain sources reachable from Actions.
+- Glossary (sell/long/short/liquidation) added as a <details> inside whoLostCard because the user was confused.
+
 ## User requests still open (2026-11-26)
 1. **Live tracking of simulation/analog paths** ("later"): log the command card's forecast every day (e.g. a JSON file written by the Actions workflow: date, price, analog median path / P(-20%), siren state) and compare with what happened after 30/90 days, to see if it works live. Not built.
 2. **Uptrend program**: the command card today only has the below-SMA150 program (out of market + 6 ladder buys + reserve). Uptrend needs its own program. Rule shape the user agreed earlier: SMA21 entry, SMA150 exit, fast exit; in trend 5 parts held + 2 parts trade channel extremes in sideways; >10% above SMA150 all 7 in; outside trend cash with one reserve buy at 70% drawdown from high. Not built; needs his confirmation of the details (profit-taking? greed levels?).
