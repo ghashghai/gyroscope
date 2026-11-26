@@ -26,8 +26,8 @@ td:first-child,th:first-child{text-align:right}
 canvas{width:100%;height:230px;display:block}
 #log div{font-size:13px;color:var(--mut)}
 button{background:var(--gold);color:var(--ink);border:0;border-radius:10px;padding:10px 16px;font-size:15px;font-weight:600;font-family:inherit}
-.siren{background:#3a1216;border:2px solid #e8645d;border-radius:12px;padding:14px;margin:12px 0;color:#ffd9d6;animation:sir 1.6s ease-in-out infinite}
-@keyframes sir{0%,100%{box-shadow:0 0 0 0 rgba(232,100,93,.55)}50%{box-shadow:0 0 14px 4px rgba(232,100,93,.55)}}
+#hero{position:relative;height:330px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#02040a;margin:12px 0;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+#hero canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .tag{display:inline-block;border:1px solid var(--line);border-radius:6px;padding:0 6px;font-size:12px;color:var(--mut);margin-inline-start:6px}
 </style>
 </head>
@@ -35,10 +35,14 @@ button{background:var(--gold);color:var(--ink);border:0;border-radius:10px;paddi
 <div class="wrap">
 <h1>رادار ژیروسکوپ</h1>
 <div class="mut">فقط آنچه در آزمون واقعی کار کرد، به‌عنوان قاعده؛ بقیه فقط اطلاعات. این پیش‌بینی نیست.</div>
+<div id="hero"><canvas id="gl"></canvas><canvas id="fx"></canvas></div>
+<div id="siren"></div>
 <div style="margin:10px 0"><button id="go">به‌روزرسانی</button></div>
 <div id="log"></div>
 <div id="out"></div>
 </div>
+<script src="scene.js?v=27"></script>
+<script src="siren.js?v=27"></script>
 <script>
 const COINS = ['BTC', 'ETH', 'BNB', 'SUI'];
 const $ = (id) => document.getElementById(id);
@@ -218,31 +222,43 @@ function parabolaCard(S) {
     '<div class="tw"><table><tr><th>فاصله از میانگین ۱۵۰ روزه</th><td>' + f(dist) + ' (شرط روشن شدن: بیش از ۱۰۰٪)</td></tr><tr><th>رتبهٔ نوسان ۳۰ روزه در تاریخ</th><td>' + f(vp) + ' (شرط: بیش از ۸۵٪)</td></tr></table></div>' +
     '<div class="mut" style="margin-top:6px">چهار سقوط ناگهانی تاریخ (۲۰۱۳ دو بار، ۲۰۱۸ دو بار) بعد از جهش شدید بودند: میانهٔ فاصله از میانگین ۱۱۸٪ و رتبهٔ نوسان ۹۰٪. وقتی هر دو شرط با هم روشن بودند، در ۷۱٪ مواقع ظرف ۳۰ روز بیش از ۲۰٪ افت آمد (حالت عادی ۱۵٪). ولی این فقط ۳ دوره (۳۵ روز) از ۲۰۱۵ به بعد بود، پس فرضیه است نه قانون.</div></div>';
 }
-// آژیر: در صلح هیچ چیز نشان نمی‌دهد؛ فقط وقتی یکی از سه شرط (روی BTC) در ۳ روز اخیر روشن بوده، بنر قرمز.
+// آژیر: در صلح خاموش؛ وقتی یکی از سه شرط (روی BTC) در ۳ روز اخیر روشن بوده، حسگر روشن می‌شود (siren.js).
 // آزمون روی تاریخ BTC: ۸٪ روزها روشن؛ ظرف ۳۰ روز افت ≥۲۰٪ بیشتر: ۳۳٪ (حالت عادی ۲۰٪).
-function sirenCard(S, aux) {
+function sirenState(S, aux) {
   const c = S.c, n = c.length, sm = smaArr(c, 150), rr = c.map((x, i) => (i ? Math.log(x / c[i - 1]) : NaN)), vs = stdRoll(rr, 30);
   const volPct = (i) => { let lo = 0, tot = 0; for (let j = 200; j <= i; j++) if (isFinite(vs[j])) { tot++; if (vs[j] < vs[i]) lo++; } return tot ? lo / tot : NaN; };
   const LATCH = 3, FRESH = 3, why = [];
   for (let k = 0; k < LATCH; k++) {
     const i = n - 1 - k; if (i < 200) break; const day = dstr(S.d[i] * 86400);
     if (isFinite(sm[i]) && c[i] / sm[i] - 1 > 1 && volPct(i) > 0.85 && !why.some((w) => w.t === 'A'))
-      why.push({ t: 'A', day, txt: 'شتاب: قیمت بیش از ۲ برابر میانگین ۱۵۰ روزه و نوسان بسیار بالا (در آزمون ۴۵٪ احتمال افت ۲۰٪ بیشتر ظرف ۳۰ روز؛ فقط ۵ دوره)' });
+      why.push({ t: 'A', day, txt: 'شتاب: قیمت بیش از ۲ برابر میانگین ۱۵۰ روزه و نوسان بسیار بالا (در آزمون ۴۵٪؛ فقط ۵ دوره)' });
     let fresh = false; if (c[i] < sm[i]) for (let j = i - FRESH; j < i; j++) if (isFinite(sm[j]) && c[j] >= sm[j]) fresh = true;
     if (fresh && !why.some((w) => w.t === 'B')) why.push({ t: 'B', day, txt: 'تازه زیر میانگین ۱۵۰ روزه بسته شد (در آزمون ۲۶٪؛ ضعیف‌ترین نشانه، ولی همان قانون خروج است)' });
     if (i >= 7 && c[i] / c[i - 7] - 1 <= -0.15 && !why.some((w) => w.t === 'C'))
       why.push({ t: 'C', day, txt: 'افت ۷ روزه ' + pct(c[i] / c[i - 7] - 1) + ' (در آزمون ۳۳٪)' });
   }
-  const test = /[?&]siren=test/.test(location.search);
-  if (test && !why.length) why.push({ t: 'T', day: dstr(S.d[n - 1] * 86400), txt: 'نمونهٔ آزمایشی برای دیدن ظاهر آژیر؛ واقعی نیست' });
-  if (!why.length) return '';
   let extra = '';
-  const L = aux.liq && aux.liq.BTC, ed = S.d[n - 1];
-  if (L && L.get(ed)) { let s = 0, k = 0; for (let i = 1; i <= 30; i++) { const v = L.get(ed - i); if (v) { s += v.l + v.s; k++; } } const t = L.get(ed); const ratio = k >= 20 ? (t.l + t.s) / (s / k) : NaN; if (ratio >= 3) extra = '<div style="margin-top:6px">دلیل کمکی: لیکویید دیروز ' + ratio.toFixed(1) + ' برابر میانگین ۳۰ روز بود (فقط توضیح؛ به‌تنهایی آژیر نمی‌زند).</div>'; }
-  return '<div class="siren"><div style="font-size:20px;font-weight:800">آژیر: خطر</div><ul style="margin:6px 0;padding-inline-start:20px">' +
-    why.map((w) => '<li>' + w.txt + ' <span class="mut">(' + w.day + ')</span></li>').join('') + '</ul>' + extra +
-    '<div class="mut" style="margin-top:6px">این پیش‌بینی نیست. طبق آزمون، در روزهای آژیر احتمال افت ۲۰٪ بیشتر ظرف ۳۰ روز ۳۳٪ بود، در برابر ۲۰٪ در حالت عادی. فقط بیت‌کوین سنجیده شده.</div></div>';
+  if (why.length) {
+    const L = aux.liq && aux.liq.BTC, ed = S.d[n - 1];
+    if (L && L.get(ed)) { let s = 0, k = 0; for (let i = 1; i <= 30; i++) { const v = L.get(ed - i); if (v) { s += v.l + v.s; k++; } } const t = L.get(ed); const ratio = k >= 20 ? (t.l + t.s) / (s / k) : NaN; if (ratio >= 3) extra = '<div>دلیل کمکی: لیکویید دیروز ' + ratio.toFixed(1) + ' برابر میانگین ۳۰ روز بود (فقط توضیح؛ به‌تنهایی آژیر نمی‌زند).</div>'; }
+  }
+  return { on: why.length > 0, why, extra };
 }
+function liqMap(liq) {
+  const out = {};
+  for (const s of (liq && liq.data) || []) { const b = String(s.symbol).split(/USDT|USD/)[0]; const m = (out[b] = new Map()); for (const x of s.history || []) m.set(Math.floor(x.t / 86400), { l: +x.l, s: +x.s }); }
+  return out;
+}
+async function refreshSiren() {  // هر ۱۵ دقیقه داده را دوباره می‌خواند تا حسگر زنده بماند
+  try {
+    const q = '?ts=' + Date.now();
+    const [oh, liq, price] = await Promise.all(['ohlcv', 'liq', 'price'].map((f) => getJSON('./' + f + '.json' + q).catch(() => null)));
+    if (!oh) return;
+    const SB = buildSeries('BTC', oh, price, Math.floor(Date.now() / 86400000));
+    if (SB && SB.c.length >= 400 && window.Siren) Siren.update(sirenState(SB, { liq: liqMap(liq) }));
+  } catch (e) { }
+}
+setInterval(refreshSiren, 15 * 60 * 1000);
 function partsCard(S) {
   const c = S.c, n = c.length, p = c[n - 1], rp = window.__rp, sm = smaArr(c, 150)[n - 1];
   if (!rp) return '';
@@ -388,7 +404,7 @@ async function run() {
     aux.liq = {};
     for (const s of (liq && liq.data) || []) { const b = String(s.symbol).split(/USDT|USD/)[0]; const m = (aux.liq[b] = new Map()); for (const x of s.history || []) m.set(Math.floor(x.t / 86400), { l: +x.l, s: +x.s }); }
     let html = '', btc = null;
-    { const SB = buildSeries('BTC', oh, price, todayDay); if (SB && SB.c.length >= 400) html += sirenCard(SB, aux); }
+    { const SB = buildSeries('BTC', oh, price, todayDay); if (SB && SB.c.length >= 400 && window.Siren) Siren.update(sirenState(SB, aux)); }
     for (const sym of COINS) {
       const S = buildSeries(sym, oh, price, todayDay);
       if (!S || S.c.length < 400) { html += '<div class="card"><h2>' + sym + '</h2><div class="mut">داده کافی نیست.</div></div>'; continue; }

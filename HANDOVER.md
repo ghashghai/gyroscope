@@ -18,14 +18,17 @@ Owner: Persian speaker, phone only, wants slow step-by-step guidance, copyable t
 - Fibonacci = symbolic map layer only (user's wish); past 3 cycle bottoms were at 0.80–0.85 retracement, not 0.618.
 - Today (2026-11-25): BTC ~59.2k, below SMA150 (~72.9k) -> red/out. Est. MVRV ~1.1 (realized price ~54.2k). Ladder: 57.4k, 54.2k, 43.4k, 42k, 39.1k, 38.0k, reserve above SMA150.
 
-## Siren (done 2026-11-26, page-only, BTC only)
-- `sirenCard(S, aux)` in index.html, rendered first in `run()`. Returns '' in peace (nothing shown); red pulsing banner when any trigger fired on one of the last 3 closed days: (A) parabola: dist150 >100% & 30d-vol percentile >85%; (B) fresh SMA150 exit: close below SMA150 and was above within the 3 days before; (C) 7-day fall >=15%. Liquidation >=3x the 30d mean is shown only as an extra line, never triggers.
-- `?siren=test` on the page URL forces a sample banner (to see how it looks).
-- Backtest (BTC, from day 200, no look-ahead): any trigger on 8.1% of days; P(-20% further within 30d) = 33% vs 20% base. By trigger: A 45% (5 episodes, hypothesis), C 33% (65 episodes), B 26% (39 episodes, weak, kept because it is the exit rule). Replay: fires on 2018-01-17, 2020-03-12, 2021-05-19, 2021-12-04, 2022-06-13, 2022-11-09, 2025-10-11. Today (2026-11-24 close, 59.8k): peace (below SMA150 for 13 days, 7d change -7.9%; C fired once ~5 days ago, out of the 3-day window).
-- Not yet: ETH/BNB/SUI (A is BTC-calibrated, B/C untested on alts); push alert (idea: Actions opens a GitHub Issue when red, untested).
+## Siren + scene (2026-11-26)
+- Page layout (index.html): hero scene (`#hero`, scene.js) -> siren sensor panel (`#siren`, siren.js) -> update button -> cards. Scripts are loaded as `scene.js?v=27` and `siren.js?v=27`: bump v when changing them (phone cache).
+- **Siren logic** is `sirenState(S, aux)` in index.html (BTC only). Trigger on any of the last 3 closed days: (A) parabola: dist150 >100% & 30d-vol percentile >85%; (B) fresh SMA150 exit (close below SMA150, was above within 3 days before); (C) 7-day fall >=15%. Liquidation >=3x 30d mean is only an extra line. It calls `Siren.update({on, why, extra})`. `refreshSiren()` re-reads ohlcv/liq/price every 15 min so the sensor stays live without reload.
+- **Siren look (siren.js)**: military sensor panel. Off = dark compact strip (head + 2 buttons). On = panel expands, red radar scope with sweep, blips per trigger (A 50deg, B 177deg, C 298deg), 3 lamps blinking, reasons list, red pulsing screen edge (`body.sn-alert`), scene turns red-tinted (`Scene.setAlert`). Buttons: sound toggle, demo toggle. `?siren=test` starts in demo mode.
+- **Sound**: WebAudio synthesized shofar (saw+square+triangle through 3 bandpass formants, lip-buzz AM, vibrato, noise breath, synthetic reverb). Pattern tekiah - shevarim - teruah - tekiah gedolah, repeated every 15.5 s while on. Browsers need one tap on the sound button per page load; no push/notifications (user declined).
+- **Scene (scene.js)**: no libs. WebGL fragment shader nebula (domain-warped fbm; phosphor blue/green gas, dark stone-like dense clouds with ridged rock grain, anisotropic quartz-silk threads, glints, faint far spiral galaxy, no sun), canvas-2D gold armillary gyroscope (3 gimbals + spinning rotor, metal shading reflecting the blue/green environment), floating quartz crystals, silk filaments, dust. Drag with a finger to tilt. Falls back to a CSS gradient without WebGL; honors prefers-reduced-motion. Verified in headless Chrome (SwiftShader), not on a real phone GPU: if it is slow, lower `gs` in `resize()`.
+- Backtest (BTC, from day 200, no look-ahead): any trigger on 8.1% of days; P(-20% further within 30d) = 33% vs 20% base. A 45% (5 episodes, hypothesis), C 33% (65), B 26% (39, weak, kept as the exit rule). Replay fires on 2018-01-17, 2020-03-12, 2021-05-19, 2021-12-04, 2022-06-13, 2022-11-09, 2025-10-11. Today (2026-11-24 close): peace.
+- Not yet: siren for ETH/BNB/SUI (A is BTC-calibrated; B/C untested on alts).
 
 ## Pending / next
-1. Siren push alert (GitHub Issue from Actions when red) and siren for ETH/BNB/SUI after testing them.
+1. Siren for ETH/BNB/SUI after testing them (no push alerts: user declined).
 2. Ladder for ETH/BNB/SUI (no MVRV: use trend + Fibonacci).
 3. Regenerate Coinalyze key -> repo Secret.
 4. Hourly chart page using ohlcv1h.json / liq1h.json (history accumulates from ~Sept 2026).
