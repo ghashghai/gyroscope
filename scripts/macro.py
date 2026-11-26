@@ -31,6 +31,44 @@ for sid, name in FRED.items():
             out['status'][name] = 'FAILED %s %s' % (kind, e)
     fails = 0 if ok else fails + 1
     time.sleep(1)
+
+# ---- fallbacks when FRED is unreachable from Actions ----
+import concurrent.futures as cf
+def yahoo(sym, name):
+    try:
+        j = json.loads(get('https://query1.finance.yahoo.com/v8/finance/chart/%s?range=2y&interval=1d' % sym))
+        r = j['chart']['result'][0]; ts = r['timestamp']; cl = r['indicators']['quote'][0]['close']
+        pts = [[time.strftime('%Y-%m-%d', time.gmtime(t)), c] for t, c in zip(ts, cl) if c is not None]
+        return name, pts, 'ok yahoo %d, last %s' % (len(pts), pts[-1][0])
+    except Exception as e:
+        return name, None, 'FAILED yahoo %s' % e
+def nyfed_rrp():
+    try:
+        j = json.loads(get('https://markets.newyorkfed.org/api/rp/reverserepo/propositions/search.json?startDate=2023-01-01&endDate=%s' % time.strftime('%Y-%m-%d')))
+        pts = {}
+        for x in j['repo']['operations']:
+            pts[x['operationDate']] = pts.get(x['operationDate'], 0) + float(x.get('totalAmtAccepted') or 0) / 1e9
+        pts = sorted([[d, v] for d, v in pts.items()])
+        return 'reverse_repo_bn', pts, 'ok nyfed %d, last %s' % (len(pts), pts[-1][0])
+    except Exception as e:
+        return 'reverse_repo_bn', None, 'FAILED nyfed %s' % e
+def tga():
+    try:
+        j = json.loads(get('https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/dts/operating_cash_balance?filter=account_type:eq:Treasury%20General%20Account%20(TGA)%20Closing%20Balance&sort=-record_date&page%5Bsize%5D=900&fields=record_date,open_today_bal,close_today_bal'))
+        pts = sorted([[x['record_date'], float(x.get('open_today_bal') or x.get('close_today_bal')) / 1e3] for x in j['data'] if (x.get('open_today_bal') or x.get('close_today_bal'))])
+        return 'tga_bn', pts, 'ok fiscaldata %d, last %s' % (len(pts), pts[-1][0])
+    except Exception as e:
+        return 'tga_bn', None, 'FAILED fiscaldata %s' % e
+jobs = []
+with cf.ThreadPoolExecutor(6) as ex:
+    if 'dollar_broad' not in out['series']: jobs.append(ex.submit(yahoo, 'DX-Y.NYB', 'dollar_broad'))
+    if 'us10y' not in out['series']: jobs.append(ex.submit(yahoo, '%5ETNX', 'us10y'))
+    if 'reverse_repo_bn' not in out['series']: jobs.append(ex.submit(nyfed_rrp))
+    if 'tga_bn' not in out['series']: jobs.append(ex.submit(tga))
+    for f in jobs:
+        name, pts, st = f.result()
+        out['status'][name] = st
+        if pts: out['series'][name] = pts[-900:]
 try:
     j = json.loads(get('https://stablecoins.llama.fi/stablecoincharts/all'))
     pts = []
