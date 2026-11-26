@@ -54,6 +54,11 @@ Owner: Persian speaker, phone only, wants slow step-by-step guidance, copyable t
 - In-sample unity test (BTC 2013-2026, real data): votes are correlated (trend~momentum .48, momentum~crowd .65); summing votes added nothing over trend alone; only clear interaction = above SMA150 with 30d fall >=15% (203 days: P(-20% in 90d) 67%, median -12%) = siren C logic. Brain stays rule-based.
 - Next: after ~50-90 days read the ledger; consider ETH/BNB/SUI rows; if a rule changes, bump RV.
 
+## Ledger RV2 (2026-11-26, later)
+- Screened 12 indicators (dist21/150, drawdown from 1y high, vol30, ret7/30, USDT supply chg, volume ratio 7/90, taker buy, ETH/BTC chg, funding7, LSR, breadth, liq long share, OI chg) conditional on trend state, split-half stability. Consistent: funding7 & LSR high (crowded longs) -> worse, vol30 high -> worse, volume ratio low -> worse, taker-buy low -> worse (below trend). Unstable: momentum, liq share, OI, breadth, ETH/BTC. USDT supply: sign depends on trend state.
+- Ledger RV2 groups (price, leverage, volatility, participation) with tercile cutoffs hardcoded in scripts/ledger.py (in-sample, optimistic); gscore = sum of group votes. In-sample: above trend score<=-2 52% P(-20%/90d), neutral 31%, positive 18%; below trend 47/33/42. Row 20782 was rebuilt once under RV2 (noted in ledger.json rv_note). Raw extras stored: dd_1y_high, dist21, vol30, volume_ratio7_90, oi_chg30, usdt_supply_chg30.
+- Scratchpad scripts: unity.py, screen.py (not in repo).
+
 ## User requests still open (2026-11-26)
 1. **Live tracking of simulation/analog paths** ("later"): log the command card's forecast every day (e.g. a JSON file written by the Actions workflow: date, price, analog median path / P(-20%), siren state) and compare with what happened after 30/90 days, to see if it works live. Not built.
 2. **Uptrend program**: the command card today only has the below-SMA150 program (out of market + 6 ladder buys + reserve). Uptrend needs its own program. Rule shape the user agreed earlier: SMA21 entry, SMA150 exit, fast exit; in trend 5 parts held + 2 parts trade channel extremes in sideways; >10% above SMA150 all 7 in; outside trend cash with one reserve buy at 70% drawdown from high. Not built; needs his confirmation of the details (profit-taking? greed levels?).

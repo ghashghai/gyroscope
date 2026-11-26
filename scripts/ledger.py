@@ -2,7 +2,12 @@
 then later fills in what actually happened (7/30/90 days). Rows are never rewritten after creation except the outcome fields.
 Rule version RV is stored in every row; if rules change, bump RV (old rows keep their own version)."""
 import json, os, time, statistics
-RV = 1
+RV = 2
+# RV2 cutoffs = terciles of BTC history (funding/LSR since 2020-22, vol since 2010, volume since 2018), measured 2026-11-26. In-sample => optimistic; the live ledger is the real test. Do not change without bumping RV.
+FUND_LO, FUND_HI = 0.0045749, 0.0094763
+LSR_LO, LSR_HI = 54.64, 64.63
+VOL_LO, VOL_HI = 0.0245326, 0.0369433
+VOLR_LO = 0.835994
 DAY = 86400
 
 def load(f):
@@ -17,7 +22,7 @@ def sym(j, name):
 def sma(a, n, i):
     return sum(a[i - n + 1:i + 1]) / n if i >= n - 1 else None
 
-def readings(day, C, D, liq, fund, lsr, ohl, whale):
+def readings(day, C, D, liq, fund, lsr, ohl, whale, oi={}, usd={}):
     """all inputs are values up to and including `day` (closed). No look-ahead."""
     i = D.index(day)
     c = C[i]
@@ -62,11 +67,39 @@ def readings(day, C, D, liq, fund, lsr, ohl, whale):
     else:
         r['taker_buy7'] = r['avg_trade7'] = None
     r['whale_cold_total'] = whale
+    import math
+    if i >= 365: r['dd_1y_high'] = c / max(C[i - 364:i + 1]) - 1
+    r['dist21'] = c / s21 - 1 if s21 else None
+    if i >= 30:
+        w = [math.log(C[k] / C[k - 1]) for k in range(i - 29, i + 1)]; m = sum(w) / 30
+        r['vol30'] = (sum((x - m) ** 2 for x in w) / 29) ** .5
+    else:
+        r['vol30'] = None
+    ob = [ohl[d] for d in range(day - 89, day + 1) if d in ohl]
+    r['volume_ratio7_90'] = (sum(x[0] for x in ob[-7:]) / 7) / (sum(x[0] for x in ob) / len(ob)) if len(ob) >= 80 else None
+    r['oi_chg30'] = (oi[day] / oi[day - 30] - 1) if day in oi and day - 30 in oi and oi[day - 30] > 0 else None
+    r['usdt_supply_chg30'] = (usd[day] / usd[day - 30] - 1) if day in usd and day - 30 in usd and usd[day - 30] > 0 else None
     # votes (+1 supports holding, -1 warns, 0 neutral) -- rule version RV
     v = {}
     v['trend'] = None if s150 is None else (1 if c >= s150 else -1)
     v['siren'] = -1 if (A or B or Cc) else 0
     v['momentum'] = None if r['ret30'] is None else (-1 if r['ret30'] <= -.15 else (1 if r['ret30'] >= .10 else 0))
+    # group votes: independent information groups, each -1/0/+1
+    g = {}
+    pr = (v['trend'] or 0) + (v['momentum'] if (v['momentum'] or 0) < 0 else 0)
+    g['price'] = 1 if pr > 0 else (-1 if pr < 0 else 0)
+    lev = 0
+    fv7, lsv = r['funding7'], r['lsr_long_pct']
+    if fv7 is not None: lev += -1 if fv7 >= FUND_HI else (1 if fv7 <= FUND_LO else 0)
+    if lsv is not None: lev += -1 if lsv >= LSR_HI else (1 if lsv <= LSR_LO else 0)
+    g['leverage'] = None if (fv7 is None and lsv is None) else (1 if lev > 0 else (-1 if lev < 0 else 0))
+    vo = r['vol30']
+    g['volatility'] = None if vo is None else (-1 if vo >= VOL_HI else (1 if vo <= VOL_LO else 0))
+    vr = r['volume_ratio7_90']
+    g['participation'] = None if vr is None else (-1 if vr <= VOLR_LO else 0)
+    r['groups'] = g
+    gs = [x for x in g.values() if x is not None]
+    r['gscore'] = sum(gs) if gs else None
     # crowd (liquidation long share) has NO vote: in-sample its sign looked opposite to the naive reading (forced selling preceded rebounds, 3 episodes). Raw value is stored; sign to be judged on live data.
     r['votes'] = v
     vs = [x for x in v.values() if x is not None]
@@ -82,7 +115,13 @@ def build():
     fund = {h['t'] // DAY: float(h['c']) for h in sym(load('funding.json'), 'BTC')}
     lsr = {h['t'] // DAY: float(h['l']) for h in sym(load('lsr.json'), 'BTC')}
     ohl = {h['t'] // DAY: (h['v'], h['bv'], h['tx']) for h in H if h.get('tx')}
-    return D, C, liq, fund, lsr, ohl
+    oi = {h['t'] // DAY: float(h['c']) for h in sym(load('oi.json'), 'BTC')}
+    usd = {}
+    try:
+        usd = {r[0] // DAY: r[1] for r in load('usdt_supply.json')['rows']}
+    except Exception:
+        pass
+    return D, C, liq, fund, lsr, ohl, oi, usd
 
 def outcomes(row_day, D, C):
     if row_day not in D: return {}
@@ -94,7 +133,7 @@ def outcomes(row_day, D, C):
     return o
 
 def main():
-    D, C, liq, fund, lsr, ohl = build()
+    D, C, liq, fund, lsr, ohl, oi, usd = build()
     L = json.load(open('ledger.json')) if os.path.exists('ledger.json') else {'rv_note': 'rows are frozen when first written; only outcome fields (fwd*/min*) are filled later', 'rows': []}
     have = {r['day'] for r in L['rows']}
     last = D[-1]
@@ -105,7 +144,7 @@ def main():
         pass
     if last not in have:
         row = {'day': last, 'rv': RV, 'live': True, 'written': int(time.time())}
-        row.update(readings(last, C, D, liq, fund, lsr, ohl, whale))
+        row.update(readings(last, C, D, liq, fund, lsr, ohl, whale, oi, usd))
         L['rows'].append(row)
     for r in L['rows']:
         r.update(outcomes(r['day'], D, C))
