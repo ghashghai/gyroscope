@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/liq.yml'
       - 'scripts/fetch.py'
+      - 'scripts/whale.py'
 permissions:
   contents: write
 jobs:
@@ -18,6 +19,9 @@ jobs:
         env:
           KEY: 322170a1-8172-4349-83cd-7fca61183feb
         run: python3 scripts/fetch.py
+      - name: Whale watch
+        continue-on-error: true
+        run: python3 scripts/whale.py
       - name: Commit
         run: |
           git config user.name "github-actions"

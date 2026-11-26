@@ -263,7 +263,7 @@ function whoLostCard(SM, aux) {
     '<b>آزمون صادقانه (۲۰۲۲ تا امروز، ۸ دوره در BTC که سهم لانگ ۳۰ روزه ≥۶۲٪ بود):</b> ظرف ۳۰ روز بعد، در ۶۲٪ موارد افت بیش از ۱۰٪ دیگر آمد؛ ولی در دوره‌هایی که فقط بازار ۱۵٪ ریخته بود (بدون شرط لیکویید) هم ۵۰٪ بود و در روز عادی ۲۲٪. یعنی اضافه بر «بازار در حال ریزش است» اطلاعاتی ندارد. ۹۰ روز بعد BTC در ۶ از ۷ مورد بالاتر بود، ولی در سایر ریزش‌ها هم همین (۶ از ۷)؛ نمونه کوچک است. پس رادار این را «خوانش وضعیت» نشان می‌دهد، نه علامت خرید یا فروش.</div></div>';
 }
 // ---------- نهنگ‌ها: صادقانه، فقط آنچه داده دارد ----------
-function whaleCard(oh, onch) {
+function whaleCard(oh, onch, wh) {
   let out = '<div class="card"><h2>حرکت نهنگ‌ها</h2>';
   // ۱) جریان صرافی (آن‌چین): وضعیت تازگی
   let stale = '';
@@ -291,6 +291,20 @@ function whaleCard(oh, onch) {
       const cs = sz[sz.length - 1], cb = by[by.length - 1];
       out += '<div style="margin-top:8px">نشانهٔ زنده (BTC، ۷ روز اخیر): اندازهٔ میانگین هر معامله ' + (cs).toFixed(4) + ' BTC (' + Math.round(rk(sz) * 100) + 'م درصدک تاریخ)؛ سهم خریدِ تهاجمی ' + pct(cb) + ' (' + Math.round(rk(by) * 100) + 'م درصدک). میانگین معامله بزرگ‌تر یعنی سهم بیشتر از بازیگران درشت؛ ولی این فقط یک تقریب است، نه ردیابی کیف‌پول نهنگ.</div>';
     }
+  }
+  // ۳) کیف‌پول‌های سردِ شناخته‌شدهٔ صرافی‌ها (mempool.space، هر ۶ ساعت ثبت می‌شود)
+  if (wh && wh.hist && wh.hist.length) {
+    const H = wh.hist, last = H[H.length - 1], names = Object.keys(last.w), tot = (x) => names.reduce((a, k) => a + (x.w[k] || 0), 0);
+    const ago = (sec) => { const t = last.t - sec; let b = null; for (const x of H) { if (x.t <= t) b = x; } return b; };
+    const d1 = ago(86400), d7 = ago(7 * 86400), fmt = (v) => (v > 0 ? '+' : '') + Math.round(v).toLocaleString('en');
+    let rows = names.map((k) => '<tr><td>' + k + '</td><td>' + Math.round(last.w[k]).toLocaleString('en') + '</td><td>' + (d1 && d1.w[k] != null ? fmt(last.w[k] - d1.w[k]) : '—') + '</td><td>' + (d7 && d7.w[k] != null ? fmt(last.w[k] - d7.w[k]) : '—') + '</td></tr>').join('');
+    const hrs = Math.round((last.t - H[0].t) / 3600);
+    out += '<div style="margin-top:10px"><b>کیف‌پول‌های سرد صرافی‌ها (BTC):</b> مجموع ' + Math.round(tot(last)).toLocaleString('en') + ' BTC. ' +
+      (hrs < 24 ? 'ثبت تازه شروع شده (' + hrs + ' ساعت)؛ تغییرها بعد از یک روز و یک هفته پر می‌شوند.' : 'تغییر ۲۴ ساعت: ' + (d1 ? fmt(tot(last) - tot(d1)) : '—') + ' BTC.') + '</div>' +
+      '<div class="tw" style="margin-top:6px"><table><tr><th>کیف‌پول</th><th>موجودی</th><th>۲۴ ساعت</th><th>۷ روز</th></tr>' + rows + '</table></div>' +
+      '<div class="mut" style="margin-top:6px">کاهش موجودی کیف‌پول سرد = BTC به‌سمت صرافی/فروش می‌رود؛ افزایش = جمع‌شدن. فقط ' + names.length + ' آدرسِ شناخته‌شده؛ برچسب‌ها عمومی و تقریبی‌اند و کل بازار را نشان نمی‌دهند. ثبت زنده از ' + dstr(H[0].t) + '.</div>';
+  } else {
+    out += '<div class="mut" style="margin-top:8px">ردیاب کیف‌پول‌های سرد صرافی‌ها هنوز اولین ثبتش را نکرده (بعد از اولین اجرای اکشنز پر می‌شود).</div>';
   }
   out += '<div class="mut" style="margin-top:8px"><b>آزمون صادقانه:</b> جریان صرافی به‌تنهایی کمی گرایش نشان داد ولی روی قانون روند (میانگین ۱۵۰) چیزی اضافه نکرد؛ سهم خرید تهاجمی هم در داده‌ها رابطهٔ پایداری با ۳۰ روز بعد نداشت. بنابراین این کارت فقط «وضعیت» نشان می‌دهد و در فرمان رأی ندارد. ردیابی واقعی نهنگ‌ها (کیف‌پول‌های بزرگ، ورود USDT به صرافی) منبع پولی می‌خواهد (CryptoQuant/Glassnode)؛ منبع رایگانی که پیدا کردم بعد از مه ۲۰۲۶ مرده است.</div></div>';
   return out;
@@ -563,6 +577,7 @@ async function run() {
   $('go').disabled = true; $('log').innerHTML = ''; $('out').innerHTML = '';
   try {
     const q = '?ts=' + Date.now();
+    const whP = getJSON('./whale.json' + q).catch(() => null);
     const [meta, oh, liq, oi, fu, ls, price, onch] = await Promise.all(['meta', 'ohlcv', 'liq', 'oi', 'funding', 'lsr', 'price', 'onchain'].map((f) => getJSON('./' + f + '.json' + q).catch((e) => { log('نیامد: ' + f, 'dn'); return null; })));
     if (!oh) throw new Error('داده قیمت هنوز در مخزن نیست');
     log('داده به‌روز شده: ' + new Date(meta.fetched * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC');
@@ -585,7 +600,7 @@ async function run() {
     html += BACKTEST;
     let cmd = '';
     if (btc) { const mvh = mvrvCard(btc, onch); cmd = commandCard(btc, btcSt, sirenSt); html += mvh + partsCard(btc) + swingCard(btc) + simCard(); }
-    $('out').innerHTML = cmd + whoLostCard(SM, aux) + whaleCard(oh, onch) + html; drawCommand(); drawSwing(); drawSim();
+    $('out').innerHTML = cmd + whoLostCard(SM, aux) + whaleCard(oh, onch, await whP) + html; drawCommand(); drawSwing(); drawSim();
   } catch (e) { log('خطا: ' + e.message, 'dn'); }
   $('go').disabled = false;
 }

@@ -45,6 +45,7 @@ Owner: Persian speaker, phone only, wants slow step-by-step guidance, copyable t
 - `whaleCard(oh, onch)` in index.html (third card, after who-lost). CoinMetrics community btc.csv (price.json/onchain.json) STOPPED updating on 2026-05-23 -> exchange flow is stale; card says so and shows the May 30d net flow only as history. Shell here cannot reach raw.githubusercontent (proxy 403); Actions can.
 - Live proxy only: BTC futures avg trade size (v/tx) and taker-buy share (bv/v), 7d, percentile vs history. In-sample check: taker-buy share terciles gave no consistent 30d edge. No vote in the command brain.
 - Real whale tracking (big wallets, exchange USDT inflow) needs paid CryptoQuant/Glassnode. Free alternative untested: other on-chain sources reachable from Actions.
+- **Whale watch (built 2026-11-26)**: scripts/whale.py (workflow step, continue-on-error) reads balances of 4 public exchange cold wallets (Binance x3, Bitfinex) from mempool.space (free, no key) every 6h -> whale.json {hist:[{t,w:{name:btc}}]}. whaleCard shows total, 24h/7d change per wallet; history starts at first Actions run. Labels are public attributions, unverified; not wired into the command brain. Untested from the sandbox (mempool.space blocked there): check `last_status` in whale.json after the first run. Idea: add more addresses, big-tx scan of the tip block.
 - Glossary (sell/long/short/liquidation) added as a <details> inside whoLostCard because the user was confused.
 
 ## User requests still open (2026-11-26)
