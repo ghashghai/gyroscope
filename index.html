@@ -42,7 +42,7 @@ button{background:var(--gold);color:var(--ink);border:0;border-radius:10px;paddi
 <div id="out"></div>
 </div>
 <script src="scene.js?v=29"></script>
-<script src="siren.js?v=28"></script>
+<script src="siren.js?v=29"></script>
 <script>
 const COINS = ['BTC', 'ETH', 'BNB', 'SUI'];
 const $ = (id) => document.getElementById(id);
@@ -562,6 +562,39 @@ function sirenFlags(c) {  // سه شرط آژیر برای هر روز (بدون
   }
   return { A, B, C, sm };
 }
+// ---------- سوپاپ اطمینان آژیر (لامپ D) ----------
+// دو حالت: (۱) رادار کور شده: آخرین داده‌ی ساعتی قدیمی‌تر از STALE_H ساعت است (اجرای «ساعتی» اکشنز گاهی تا ۱۵ ساعت جا می‌افتاد).
+// (۲) رادار غافلگیر شد: BTC در ۲۴ ساعت دست‌کم ۱۰٪ افت کرد در حالی که نقطه‌های هشدارِ قیمتیِ رادار کمتر از ۳ بود.
+// سوپاپ فرمان فروش نیست. sirenSt که کارت‌ها استفاده می‌کنند دست‌نخورده می‌ماند؛ سوپاپ فقط به خروجی حسگر اضافه می‌شود.
+const VALVE = { STALE_H: 6, FALL24: -0.10, CALM_PTS: 3 };
+function priceDangerPts(c) {  // نسخهٔ قیمتیِ نقطه‌های خطر (بدون آژیر و بدون لانگ‌های شلوغ)؛ همان قاعده‌های نقشهٔ روند و scripts/ledger.py
+  const n = c.length; if (n < 366) return 99;
+  const sm = (k) => { let t = 0; for (let i = n - k; i < n; i++) t += c[i]; return t / k; }, p = c[n - 1]; let pts = 0;
+  if (p / sm(150) - 1 < -0.01) pts += 2; if (p / sm(21) - 1 < -0.01) pts += 1; if (p / sm(365) - 1 < -0.01) pts += 1;
+  if (p / c[n - 31] - 1 <= -0.15 || p / c[n - 8] - 1 <= -0.08) pts += 1;
+  const mx = (a, b) => Math.max.apply(null, c.slice(n - b, n - a)), mn = (a, b) => Math.min.apply(null, c.slice(n - b, n - a));
+  if (mx(0, 30) < mx(30, 60) && mn(0, 30) < mn(30, 60)) pts += 1;
+  return pts;
+}
+function valveWhy(oh1, S, nowSec) {
+  const why = [], now = nowSec || Math.floor(Date.now() / 1000); let extra = '';
+  if (!oh1 || !oh1.fetched) return { why, extra };   // فایل خوانده نشد: نمی‌شود قضاوت کرد (خطای شبکهٔ خود صفحه را آژیر نمی‌کنیم)
+  const ageH = (now - oh1.fetched) / 3600;
+  if (ageH > VALVE.STALE_H) why.push({ t: 'D', day: 'خطای ابزار', txt: 'سوپاپ — رادار کور شده: آخرین داده‌ی ساعتی ' + Math.floor(ageH) + ' ساعت پیش گرفته شده (حد ' + VALVE.STALE_H + ' ساعت). هر اتفاقی در این مدت را رادار ندیده؛ قیمت زنده را خودت ببین. این خطای ابزار است، نه حرکت بازار.' });
+  const sy = ((oh1.data) || []).find((x) => String(x.symbol).startsWith('BTCUSDT')), H = sy ? sy.history.filter((x) => x.t + 3600 <= now).map((x) => x.c) : [];
+  if (S && H.length > 30) {
+    const f24 = H[H.length - 1] / H[H.length - 25] - 1, pts = priceDangerPts(S.c);
+    if (f24 <= VALVE.FALL24 && pts < VALVE.CALM_PTS) {
+      why.push({ t: 'D', day: '۲۴ ساعت اخیر', txt: 'سوپاپ — رادار غافلگیر شد: قیمت در ۲۴ ساعت ' + pct(f24) + ' افت کرد، ولی رادار آرام بود (فقط ' + pts + ' نقطهٔ هشدار قیمتی؛ حد آرام: کمتر از ' + VALVE.CALM_PTS + ').' });
+      extra = '<div>سوپاپ فرمان فروش نیست: از ۲۰۱۴ تا ۲۰۲۶، ۱۴ دوره (حدود ۱ بار در سال) BTC در حالت آرام یک‌روزه ۱۰٪ یا بیشتر افت کرد؛ بعدش میانهٔ ۳۰ روز ' + '+۹٫۴٪ بود و احتمال افت ۲۰٪ در ۹۰ روز ۳۸٪ (حد پایه ۳۶٪). یعنی فقط می‌گوید رادار غافلگیر شد. آزمون روی بستهٔ روزانه است، نه ساعتی.</div>';
+    }
+  }
+  return { why, extra };
+}
+function sirenAll(st, oh1, S) {  // سه لامپ A/B/C + سوپاپ D برای حسگر
+  const v = valveWhy(oh1, S);
+  return v.why.length ? { on: true, why: st.why.concat(v.why), extra: (st.extra || '') + v.extra } : st;
+}
 function sirenState(S, aux) {
   const c = S.c, n = c.length, F = sirenFlags(c), why = [];
   for (let k = 0; k < 3; k++) {  // هر شرطی در ۳ روز اخیر روشن بوده باشد
@@ -679,10 +712,10 @@ function liqMap(liq) {
 async function refreshSiren() {  // هر ۱۵ دقیقه داده را دوباره می‌خواند تا حسگر زنده بماند
   try {
     const q = '?ts=' + Date.now();
-    const [oh, liq, price] = await Promise.all(['ohlcv', 'liq', 'price'].map((f) => getJSON('./' + f + '.json' + q).catch(() => null)));
+    const [oh, liq, price, oh1] = await Promise.all(['ohlcv', 'liq', 'price', 'ohlcv1h'].map((f) => getJSON('./' + f + '.json' + q).catch(() => null)));
     if (!oh) return;
     const SB = buildSeries('BTC', oh, price, Math.floor(Date.now() / 86400000));
-    if (SB && SB.c.length >= 400 && window.Siren) Siren.update(sirenState(SB, { liq: liqMap(liq) }));
+    if (SB && SB.c.length >= 400 && window.Siren) Siren.update(sirenAll(sirenState(SB, { liq: liqMap(liq) }), oh1, SB));
   } catch (e) { }
 }
 setInterval(refreshSiren, 15 * 60 * 1000);
@@ -833,7 +866,7 @@ async function run() {
     aux.liq = {};
     for (const s of (liq && liq.data) || []) { const b = String(s.symbol).split(/USDT|USD/)[0]; const m = (aux.liq[b] = new Map()); for (const x of s.history || []) m.set(Math.floor(x.t / 86400), { l: +x.l, s: +x.s }); }
     let html = '', btc = null, btcSt = null, sirenSt = null; const SM = {};
-    { const SB = buildSeries('BTC', oh, price, todayDay); if (SB && SB.c.length >= 400) { sirenSt = sirenState(SB, aux); if (window.Siren) Siren.update(sirenSt); } }
+    { const SB = buildSeries('BTC', oh, price, todayDay); if (SB && SB.c.length >= 400) { sirenSt = sirenState(SB, aux); if (window.Siren) { let oh1v = null; try { oh1v = await h1P; } catch (e) { } Siren.update(sirenAll(sirenSt, oh1v, SB)); } } }
     for (const sym of COINS) {
       const S = buildSeries(sym, oh, price, todayDay);
       if (!S || S.c.length < 400) { html += '<div class="card"><h2>' + sym + '</h2><div class="mut">داده کافی نیست.</div></div>'; continue; }

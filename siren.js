@@ -53,6 +53,7 @@ body.sn-alert::after{content:'';position:fixed;inset:0;pointer-events:none;z-ind
         <div class="lamp" data-t="A"><span class="led"></span><span class="l">A</span>شتاب</div>
         <div class="lamp" data-t="B"><span class="led"></span><span class="l">B</span>خروج از روند</div>
         <div class="lamp" data-t="C"><span class="led"></span><span class="l">C</span>افت ۷ روزه</div>
+        <div class="lamp" data-t="D"><span class="led"></span><span class="l">D</span>سوپاپ رادار</div>
       </div></div>
     <ul class="sn-why" id="snwhy"></ul><div class="sn-note" id="snnote"></div>
   </div>
@@ -62,9 +63,9 @@ body.sn-alert::after{content:'';position:fixed;inset:0;pointer-events:none;z-ind
   ['pointerdown', 'touchstart', 'mousedown'].forEach((ev) => mini.addEventListener(ev, (e) => e.stopPropagation()));
   const $ = (id) => document.getElementById(id), box = $('sn'), cv = $('snsc'), ctx = cv.getContext('2d'), S = 168;
   cv.width = S * DPR; cv.height = S * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  const SECT = { A: [.9, .66], B: [3.1, .46], C: [5.2, .78] };  // angle (rad), radius fraction of the blip per trigger
+  const SECT = { A: [.9, .66], B: [3.1, .46], C: [5.2, .78], D: [2.0, .6] };  // angle (rad), radius fraction of the blip per trigger
   const DEMO = { on: true, why: [{ t: 'A', day: 'آزمایشی', txt: 'نمونهٔ آزمایشی: شتاب' }, { t: 'C', day: 'آزمایشی', txt: 'نمونهٔ آزمایشی: افت ۷ روزه ۱۸٪' }], extra: '' };
-  let real = { on: false, why: [], extra: '' }, demo = /[?&]siren=test/.test(location.search), on = false, power = 0, raf = 0, last = 0, soundOn = false, hideT = 0;
+  let real = { on: false, why: [], extra: '' }, demo = /[?&]siren=test/.test(location.search), on = false, power = 0, raf = 0, last = 0, soundOn = false, loopOn = false, hideT = 0;
   const clutter = []; { let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647; for (let i = 0; i < 16; i++) clutter.push([r() * TAU, .15 + r() * .8]); }
 
   /* ---------- radar scope ---------- */
@@ -148,11 +149,12 @@ body.sn-alert::after{content:'';position:fixed;inset:0;pointer-events:none;z-ind
   /* ---------- state ---------- */
   function apply() {
     const s = demo ? DEMO : real, next = !!(demo || real.on);
+    const onlyD = !demo && s.why.length > 0 && s.why.every((w) => w.t === 'D');   // safety valve alone: tool blind / radar surprised, not a market-danger siren
     box.classList.toggle('demo', demo);
     box.querySelectorAll('.lamp').forEach((l) => { const hit = s.why.some((w) => w.t === l.dataset.t); l.classList.toggle('on', hit); l.firstChild.classList.toggle('lit', hit); });
     $('snwhy').innerHTML = s.why.map((w) => '<li>' + w.txt + ' <span style="color:#8c9582">(' + w.day + ')</span></li>').join('');
-    $('snnote').innerHTML = (s.extra || '') + (demo ? '<div>حالت آزمایشی است؛ واقعی نیست.</div>' : '<div>پیش‌بینی نیست. در آزمون، در روزهای آژیر احتمال افت ۲۰٪ بیشتر ظرف ۳۰ روز ۳۳٪ بود، در برابر ۲۰٪ در حالت عادی. فقط بیت‌کوین سنجیده شده.</div>');
-    $('snst').textContent = next ? (demo ? 'آزمایشی · ALERT' : 'خطر · ALERT') : 'خاموش · آرامش';
+    $('snnote').innerHTML = (s.extra || '') + (demo ? '<div>حالت آزمایشی است؛ واقعی نیست.</div>' : onlyD ? '' : '<div>پیش‌بینی نیست. در آزمون، در روزهای آژیر احتمال افت ۲۰٪ بیشتر ظرف ۳۰ روز ۳۳٪ بود، در برابر ۲۰٪ در حالت عادی. فقط بیت‌کوین سنجیده شده.</div>');
+    $('snst').textContent = next ? (demo ? 'آزمایشی · ALERT' : onlyD ? 'سوپاپ · VALVE' : 'خطر · ALERT') : 'خاموش · آرامش';
     $('snled').classList.toggle('lit', next);
     $('sndemo').textContent = demo ? 'پایان آزمایش' : 'آزمایش آژیر'; $('sndemo').classList.toggle('act', demo);
     if (next !== on) {
@@ -160,12 +162,14 @@ body.sn-alert::after{content:'';position:fixed;inset:0;pointer-events:none;z-ind
       if (on) { host.style.display = 'block'; void host.offsetHeight; box.classList.add('on'); startLoop(); }
       else { box.classList.remove('on'); hideT = setTimeout(() => { if (!on) host.style.display = 'none'; }, 1000); }
       if (window.Scene && Scene.setAlert) Scene.setAlert(on);
-      if (soundOn) on ? Shofar.loop() : Shofar.stopLoop();
     }
+    // horn loop only for market-danger states; a valve-only state (tool blind / radar surprised) can last hours, so it stays silent
+    const want = !!(soundOn && on && !onlyD);
+    if (want !== loopOn) { loopOn = want; want ? Shofar.loop() : Shofar.stopLoop(); }
   }
   $('snsnd').onclick = () => {
-    if (!soundOn) { if (!Shofar.enable()) { $('snsnd').textContent = 'صدا در این مرورگر نیست'; return; } soundOn = true; $('snsnd').textContent = 'صدا: روشن'; $('snsnd').classList.add('act'); if (on) setTimeout(() => Shofar.loop(), 2200); }
-    else { soundOn = false; Shofar.stopLoop(); $('snsnd').textContent = 'صدا: خاموش'; $('snsnd').classList.remove('act'); }
+    if (!soundOn) { if (!Shofar.enable()) { $('snsnd').textContent = 'صدا در این مرورگر نیست'; return; } soundOn = true; $('snsnd').textContent = 'صدا: روشن'; $('snsnd').classList.add('act'); if (on && !(real.why.length && real.why.every((w) => w.t === 'D'))) { loopOn = true; setTimeout(() => Shofar.loop(), 2200); } }
+    else { soundOn = false; loopOn = false; Shofar.stopLoop(); $('snsnd').textContent = 'صدا: خاموش'; $('snsnd').classList.remove('act'); }
   };
   $('sndemo').onclick = () => { demo = !demo; apply(); };
   window.Siren = { update(s) { real = s || real; apply(); } };

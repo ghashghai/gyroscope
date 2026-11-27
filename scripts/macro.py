@@ -54,8 +54,12 @@ def nyfed_rrp():
         return 'reverse_repo_bn', None, 'FAILED nyfed %s' % e
 def tga():
     try:
-        j = json.loads(get('https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/dts/operating_cash_balance?filter=account_type:eq:Treasury%20General%20Account%20(TGA)%20Closing%20Balance&sort=-record_date&page%5Bsize%5D=4000&fields=record_date,open_today_bal,close_today_bal'))
-        pts = sorted([[x['record_date'], float(x.get('open_today_bal') or x.get('close_today_bal')) / 1e3] for x in j['data'] if (x.get('open_today_bal') or x.get('close_today_bal'))])
+        rows = []
+        for page in (1, 2, 3):   # one request of 4000 rows timed out in Actions; pages of 1000 are the size that worked
+            j = json.loads(get('https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/dts/operating_cash_balance?filter=account_type:eq:Treasury%20General%20Account%20(TGA)%20Closing%20Balance&sort=-record_date&page%5Bsize%5D=1000&page%5Bnumber%5D=' + str(page) + '&fields=record_date,open_today_bal,close_today_bal'))
+            rows += j['data']
+            if len(j['data']) < 1000: break
+        pts = sorted([[x['record_date'], float(x.get('open_today_bal') or x.get('close_today_bal')) / 1e3] for x in rows if (x.get('open_today_bal') or x.get('close_today_bal'))])
         return 'tga_bn', pts, 'ok fiscaldata %d, last %s' % (len(pts), pts[-1][0])
     except Exception as e:
         return 'tga_bn', None, 'FAILED fiscaldata %s' % e
