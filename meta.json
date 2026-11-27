@@ -1,5 +1,5 @@
 {
- "fetched": 1795817096,
+ "fetched": 1795823121,
  "status": {
   "liquidation-history": {
    "BNBUSDT_PERP.A": 1508,
@@ -32,15 +32,15 @@
    "SUIUSDT_PERP.A": 1305
   },
   "ohlcv1h.json": {
-   "BNBUSDT_PERP.A": 1989,
-   "BTCUSDT_PERP.A": 1989,
-   "ETHUSDT_PERP.A": 1989,
-   "SUIUSDT_PERP.A": 1989
+   "BNBUSDT_PERP.A": 1990,
+   "BTCUSDT_PERP.A": 1990,
+   "ETHUSDT_PERP.A": 1990,
+   "SUIUSDT_PERP.A": 1990
   },
   "liq1h.json": {
-   "BNBUSDT_PERP.A": 1613,
-   "BTCUSDT_PERP.A": 1683,
-   "ETHUSDT_PERP.A": 1671,
+   "BNBUSDT_PERP.A": 1614,
+   "BTCUSDT_PERP.A": 1684,
+   "ETHUSDT_PERP.A": 1672,
    "SUIUSDT_PERP.A": 1833
   },
   "onchain": "11 cols: AdrActCnt,AdrBalCnt,CapMVRVCur,CapMrktCurUSD,FlowInExNtv,FlowInExUSD,FlowOutExNtv,FlowOutExUSD,SplyCur,SplyExpFut10yr,TxCnt",
