@@ -1,47 +1,47 @@
 {
- "fetched": 1795723053,
+ "fetched": 1795738962,
  "status": {
   "liquidation-history": {
    "BNBUSDT_PERP.A": 1507,
-   "BTCUSDT_PERP.A": 1504,
-   "ETHUSDT_PERP.A": 1504,
-   "SUIUSDT_PERP.A": 1304
+   "BTCUSDT_PERP.A": 1505,
+   "ETHUSDT_PERP.A": 1505,
+   "SUIUSDT_PERP.A": 1305
   },
   "open-interest-history": {
-   "BNBUSDT_PERP.A": 1504,
-   "BTCUSDT_PERP.A": 1504,
-   "ETHUSDT_PERP.A": 1504,
-   "SUIUSDT_PERP.A": 1304
+   "BNBUSDT_PERP.A": 1505,
+   "BTCUSDT_PERP.A": 1505,
+   "ETHUSDT_PERP.A": 1505,
+   "SUIUSDT_PERP.A": 1305
   },
   "funding-rate-history": {
-   "BNBUSDT_PERP.A": 2482,
-   "BTCUSDT_PERP.A": 2502,
-   "ETHUSDT_PERP.A": 2502,
-   "SUIUSDT_PERP.A": 1304
+   "BNBUSDT_PERP.A": 2483,
+   "BTCUSDT_PERP.A": 2503,
+   "ETHUSDT_PERP.A": 2503,
+   "SUIUSDT_PERP.A": 1305
   },
   "long-short-ratio-history": {
-   "BNBUSDT_PERP.A": 2362,
-   "BTCUSDT_PERP.A": 2363,
-   "ETHUSDT_PERP.A": 2363,
-   "SUIUSDT_PERP.A": 1303
-  },
-  "ohlcv-history": {
-   "BNBUSDT_PERP.A": 2482,
-   "BTCUSDT_PERP.A": 2633,
-   "ETHUSDT_PERP.A": 2534,
+   "BNBUSDT_PERP.A": 2363,
+   "BTCUSDT_PERP.A": 2364,
+   "ETHUSDT_PERP.A": 2364,
    "SUIUSDT_PERP.A": 1304
   },
+  "ohlcv-history": {
+   "BNBUSDT_PERP.A": 2483,
+   "BTCUSDT_PERP.A": 2634,
+   "ETHUSDT_PERP.A": 2535,
+   "SUIUSDT_PERP.A": 1305
+  },
   "ohlcv1h.json": {
-   "BNBUSDT_PERP.A": 1962,
-   "BTCUSDT_PERP.A": 1962,
-   "ETHUSDT_PERP.A": 1962,
-   "SUIUSDT_PERP.A": 1962
+   "BNBUSDT_PERP.A": 1967,
+   "BTCUSDT_PERP.A": 1967,
+   "ETHUSDT_PERP.A": 1967,
+   "SUIUSDT_PERP.A": 1967
   },
   "liq1h.json": {
-   "BNBUSDT_PERP.A": 1596,
-   "BTCUSDT_PERP.A": 1656,
-   "ETHUSDT_PERP.A": 1644,
-   "SUIUSDT_PERP.A": 1809
+   "BNBUSDT_PERP.A": 1599,
+   "BTCUSDT_PERP.A": 1661,
+   "ETHUSDT_PERP.A": 1649,
+   "SUIUSDT_PERP.A": 1814
   },
   "onchain": "11 cols: AdrActCnt,AdrBalCnt,CapMVRVCur,CapMrktCurUSD,FlowInExNtv,FlowInExUSD,FlowOutExNtv,FlowOutExUSD,SplyCur,SplyExpFut10yr,TxCnt",
   "btc_all_cols": "time,AdrActCnt,AdrBalCnt,AssetCompletionTime,AssetEODCompletionTime,BlkCnt,CapMVRVCur,CapMrktCurUSD,CapMrktEstUSD,FeeTotNtv,FlowInExNtv,FlowInExUSD,FlowOutExNtv,FlowOutExUSD,HashRate,IssTotNtv,IssTotUSD,PriceBTC,PriceUSD,ROI1yr,ROI30d,ReferenceRate,ReferenceRateETH,ReferenceRateEUR,ReferenceRateUSD,SplyCur,SplyExNtv,SplyExUSD,SplyExpFut10yr,TxCnt,TxTfrCnt,volume_reported_spot_usd_1d",
