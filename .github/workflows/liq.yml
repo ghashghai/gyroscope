@@ -12,7 +12,7 @@ on:
       - 'scripts/macro.py'
       - 'scripts/macro_test.py'
       - 'scripts/regime.py'
-      - 'scripts/channel.py'
+      - 'scripts/book.py'
       - 'scripts/ledger.py'
 permissions:
   contents: write
@@ -40,9 +40,9 @@ jobs:
       - name: Regime timeline
         continue-on-error: true
         run: python3 scripts/regime.py
-      - name: Channel experiment part
+      - name: Paper account (book)
         continue-on-error: true
-        run: python3 scripts/channel.py
+        run: python3 scripts/book.py
       - name: Ledger
         continue-on-error: true
         run: python3 scripts/ledger.py

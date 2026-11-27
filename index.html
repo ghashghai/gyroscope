@@ -132,21 +132,27 @@ function card2(S, price) {
   h += '<div class="warn">این نقشهٔ ریاضی است، نه فرمان: آمار نشان نداده قیمت در این سطح‌ها برمی‌گردد. فرمان را رژیم و آژیر می‌دهند.</div>';
   el.innerHTML = h;
 }
-function card4(ch) {
-  const el = document.getElementById('c4'); if (!ch || !ch.state) { el.innerHTML = '<h2>۴ · قسمت آزمایش (کانال)</h2><div class="mut">هنوز داده نیست.</div>'; return; }
-  const s = ch.state, T = ch.trades || [], v = ch.value, pcn = (v - 1);
-  let st = !s.active ? 'خاموش: قیمت زیر میانگین ۱۵۰ روزه است، قسمت نقد می‌ماند.' : s.units > 0 ? 'در معامله: خریده و منتظر سقف کانال است.' : 'روشن و نقد: منتظر رسیدن قیمت به کف کانال.';
-  if (s.pending) st += ' سفارش بعدی: ' + (s.pending.side === 'buy' ? 'خرید' : 'فروش') + ' (با بستهٔ فردا).';
-  let h = '<h2>۴ · قسمت آزمایش (کانال)</h2><div class="big ' + (pcn >= 0 ? 'up' : 'dn') + '">' + fa(v.toFixed(3)).replace('.', '٫') + '</div><div class="mut">ارزش یک قسمت (۱ = روز شروع، ' + fa(ch.start) + ') · تا ' + fa(ch.value_day) + '</div>';
-  h += '<div style="margin-top:6px">' + st + '</div>';
-  if (s.active && s.L) h += '<div class="mut">کانال: ' + nf(s.L) + ' تا ' + nf(s.U) + '</div>';
-  h += '<div class="mut">معامله‌ها تا حالا: ' + fa(T.length) + (T.length ? ' · آخرین: ' + (T[T.length - 1].side === 'buy' ? 'خرید' : 'فروش') + ' ' + fa(T[T.length - 1].date) + ' در ' + nf(T[T.length - 1].price) : '') + '</div>';
-  h += '<div class="warn">آزمایش با پول فرضی، فقط بیت‌کوین. از روز شروع ثبت می‌شود و چیزی عقب‌نگری نشده. سود تضمین‌شده نیست؛ در آمار گذشته میانه‌ی نتیجه حدود ۱٫۲۲ بود ولی ۳۳٪ پنجره‌ها زیان‌ده بودند.</div>';
+function card4(B) {
+  const el = document.getElementById('c4'); if (!B || !B.coins) { el.innerHTML = '<h2>۴ · حسابداری سهم‌ها</h2><div class="mut">هنوز داده نیست.</div>'; return; }
+  const usd0 = (x) => fa(Math.round(x).toLocaleString('en-US')) + '$', pp = (x) => fa((x * 100).toFixed(0)) + '٪';
+  const eP = B.engaged / B.total, fP = B.free / B.total;
+  let h = '<h2>۴ · حسابداری سهم‌ها (پول فرضی ' + usd0(B.capital) + '، شروع ' + fa(B.start) + ')</h2>';
+  h += '<div class="big">' + usd0(B.total) + ' <span class="mut">(' + (B.pnl_pct >= 0 ? '+' : '−') + fa(Math.abs(B.pnl_pct * 100).toFixed(1)).replace('.', '٫') + '٪ از شروع)</span></div>';
+  h += '<div style="display:flex;height:16px;border-radius:8px;overflow:hidden;margin:8px 0;background:#0b1220"><div style="width:' + (eP * 100) + '%;background:var(--amb)"></div><div style="width:' + (fP * 100) + '%;background:#2b3b57"></div></div>';
+  h += '<div><b class="am">درگیر: ' + usd0(B.engaged) + ' (' + pp(eP) + ')</b> &nbsp; <b>غیر درگیر: ' + usd0(B.free) + ' (' + pp(fP) + ')</b></div>';
+  h += '<div class="mut">درگیر یعنی الان به شکل ارز در معامله است. غیر درگیر یعنی نقد (USDT): هسته ' + usd0(B.core) + ' + قسمت‌های خالی.</div>';
+  h += '<table style="margin-top:8px"><tr class="mut"><td>ارز</td><td class="n">درگیر</td><td class="n">آزاد</td><td>روند</td><td>کانال</td></tr>';
+  const cs = { in: 'در معامله', on: 'روشن، نقد', off: 'خاموش' };
+  for (const r of B.coins) h += '<tr><td><b>' + r.coin + '</b></td><td class="n">' + usd0(r.engaged) + '</td><td class="n">' + usd0(r.free) + '</td><td>' + fa(r.trend_parts) + ' از ۴</td><td>' + cs[r.chan_state] + '</td></tr>';
+  h += '</table><div class="mut" style="margin-top:6px">هر ارز ۷ قسمت دارد: ۴ قسمت روند (هفته‌ای یکی، فقط بالای خط ۱۵۰ و ۲۱)، ۱ قسمت آزمایش کانال، ۲ قسمت ذخیره (نقد). جمع «درگیر + غیر درگیر» همیشه برابر ارزش کل است و برنامه در هر اجرا این را وارسی می‌کند.</div>';
+  const T = B.trades || [], l = T[T.length - 1];
+  h += '<div class="mut">معامله‌ها تا حالا: ' + fa(B.n_trades) + (l ? ' · آخرین: ' + l.coin + ' ' + (l.side === 'buy' ? 'خرید' : 'فروش') + ' ' + fa(l.date) : '') + '</div>';
+  h += '<div class="warn">پول فرضی؛ از روز شروع ثبت می‌شود و چیزی عقب‌نگری نشده. قیمت‌ها آخرین بستهٔ روزانه است. سود تضمین‌شده نیست: در آمار گذشته کانال در ETH و BNB میانه‌ی ضررده بود و در BTC سودده؛ هرکدام فقط یک قسمت است.</div>';
   el.innerHTML = h;
 }
 (async function () {
   try {
-    const [oh, price, rg, h1, chj] = await Promise.all([getJSON('./ohlcv.json' + q), getJSON('./price.json' + q), getJSON('./regime.json' + q).catch(() => ({})), getJSON('./ohlcv1h.json' + q).catch(() => null), getJSON('./channel.json' + q).catch(() => null)]);
+    const [oh, price, rg, h1, chj] = await Promise.all([getJSON('./ohlcv.json' + q), getJSON('./price.json' + q), getJSON('./regime.json' + q).catch(() => ({})), getJSON('./ohlcv1h.json' + q).catch(() => null), getJSON('./book.json' + q).catch(() => null)]);
     const S = buildSeries('BTC', oh, price, Math.floor(oh.fetched / 86400));
     let p = S.c[S.c.length - 1], pt = 'آخرین بستهٔ روزانه';
     if (h1) { const sy = (h1.data || []).find((x) => String(x.symbol).startsWith('BTCUSDT')), now = Math.floor(Date.now() / 1000), H = sy ? sy.history.filter((x) => x.t + 3600 <= now) : []; if (H.length) { p = H[H.length - 1].c; pt = 'آخرین ساعت'; } }
