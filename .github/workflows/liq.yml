@@ -12,6 +12,7 @@ on:
       - 'scripts/macro.py'
       - 'scripts/macro_test.py'
       - 'scripts/regime.py'
+      - 'scripts/channel.py'
       - 'scripts/ledger.py'
 permissions:
   contents: write
@@ -39,6 +40,9 @@ jobs:
       - name: Regime timeline
         continue-on-error: true
         run: python3 scripts/regime.py
+      - name: Channel experiment part
+        continue-on-error: true
+        run: python3 scripts/channel.py
       - name: Ledger
         continue-on-error: true
         run: python3 scripts/ledger.py

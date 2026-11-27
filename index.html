@@ -34,6 +34,7 @@ a{color:var(--gold)}
 <div id="siren"></div>
 <div class="card" id="c1"><h2>۱ · الان کجاییم؟</h2><div class="mut">…</div></div>
 <div class="card" id="c2"><h2>۲ · مرز بعدی کجاست؟ (فیبوناچی)</h2><div class="mut">…</div></div>
+<div class="card" id="c4"><h2>۴ · قسمت آزمایش (کانال)</h2><div class="mut">…</div></div>
 <div class="card"><h2>۳ · آژیر</h2><div class="mut">در آرامش پنهان است. بالای همین صفحه فقط وقتی خطر باشد روشن می‌شود. هیچ اعلانی به گوشی نمی‌فرستد.</div></div>
 <div class="mut" style="margin:18px 0">برنامه فقط هشدار می‌دهد؛ اهرم و شورت ندارد. همهٔ عددها از داده‌ی واقعی خوانده می‌شوند. <a href="full.html">صفحهٔ کامل قبلی (رادار، دفتر، همه‌ی کارت‌ها)</a></div>
 </div>
@@ -131,15 +132,27 @@ function card2(S, price) {
   h += '<div class="warn">این نقشهٔ ریاضی است، نه فرمان: آمار نشان نداده قیمت در این سطح‌ها برمی‌گردد. فرمان را رژیم و آژیر می‌دهند.</div>';
   el.innerHTML = h;
 }
+function card4(ch) {
+  const el = document.getElementById('c4'); if (!ch || !ch.state) { el.innerHTML = '<h2>۴ · قسمت آزمایش (کانال)</h2><div class="mut">هنوز داده نیست.</div>'; return; }
+  const s = ch.state, T = ch.trades || [], v = ch.value, pcn = (v - 1);
+  let st = !s.active ? 'خاموش: قیمت زیر میانگین ۱۵۰ روزه است، قسمت نقد می‌ماند.' : s.units > 0 ? 'در معامله: خریده و منتظر سقف کانال است.' : 'روشن و نقد: منتظر رسیدن قیمت به کف کانال.';
+  if (s.pending) st += ' سفارش بعدی: ' + (s.pending.side === 'buy' ? 'خرید' : 'فروش') + ' (با بستهٔ فردا).';
+  let h = '<h2>۴ · قسمت آزمایش (کانال)</h2><div class="big ' + (pcn >= 0 ? 'up' : 'dn') + '">' + fa(v.toFixed(3)).replace('.', '٫') + '</div><div class="mut">ارزش یک قسمت (۱ = روز شروع، ' + fa(ch.start) + ') · تا ' + fa(ch.value_day) + '</div>';
+  h += '<div style="margin-top:6px">' + st + '</div>';
+  if (s.active && s.L) h += '<div class="mut">کانال: ' + nf(s.L) + ' تا ' + nf(s.U) + '</div>';
+  h += '<div class="mut">معامله‌ها تا حالا: ' + fa(T.length) + (T.length ? ' · آخرین: ' + (T[T.length - 1].side === 'buy' ? 'خرید' : 'فروش') + ' ' + fa(T[T.length - 1].date) + ' در ' + nf(T[T.length - 1].price) : '') + '</div>';
+  h += '<div class="warn">آزمایش با پول فرضی، فقط بیت‌کوین. از روز شروع ثبت می‌شود و چیزی عقب‌نگری نشده. سود تضمین‌شده نیست؛ در آمار گذشته میانه‌ی نتیجه حدود ۱٫۲۲ بود ولی ۳۳٪ پنجره‌ها زیان‌ده بودند.</div>';
+  el.innerHTML = h;
+}
 (async function () {
   try {
-    const [oh, price, rg, h1] = await Promise.all([getJSON('./ohlcv.json' + q), getJSON('./price.json' + q), getJSON('./regime.json' + q).catch(() => ({})), getJSON('./ohlcv1h.json' + q).catch(() => null)]);
+    const [oh, price, rg, h1, chj] = await Promise.all([getJSON('./ohlcv.json' + q), getJSON('./price.json' + q), getJSON('./regime.json' + q).catch(() => ({})), getJSON('./ohlcv1h.json' + q).catch(() => null), getJSON('./channel.json' + q).catch(() => null)]);
     const S = buildSeries('BTC', oh, price, Math.floor(oh.fetched / 86400));
     let p = S.c[S.c.length - 1], pt = 'آخرین بستهٔ روزانه';
     if (h1) { const sy = (h1.data || []).find((x) => String(x.symbol).startsWith('BTCUSDT')), now = Math.floor(Date.now() / 1000), H = sy ? sy.history.filter((x) => x.t + 3600 <= now) : []; if (H.length) { p = H[H.length - 1].c; pt = 'آخرین ساعت'; } }
     const age = h1 && h1.fetched ? (Date.now() / 1000 - h1.fetched) / 3600 : NaN;
     document.getElementById('stamp').innerHTML = 'قیمت: ' + pt + (isFinite(age) ? ' · داده ' + fa(Math.floor(age)) + ' ساعت پیش گرفته شد' + (age > 6 ? ' <span class="warn">(قدیمی)</span>' : '') : '');
-    card1(rg, p); card2(S, p);
+    card1(rg, p); card2(S, p); card4(chj);
     const upd = () => window.Siren && Siren.update(sirenAll(S, h1));
     upd();
     setInterval(async () => { try { const h = await getJSON('./ohlcv1h.json?t=' + Date.now()); if (window.Siren) Siren.update(sirenAll(S, h)); } catch (e) { } }, 900000);
