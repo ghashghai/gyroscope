@@ -5,7 +5,7 @@ Hypothetical capital 1000 at the start day (the user's choice). Split fixed in a
   core = 1/3 (USDT, never touched) ; the other 2/3 is split equally between BTC, ETH, BNB, SUI ; each coin bucket = 7 equal parts.
 Per coin the 7 parts are assigned like this:
   4 parts  TREND   : buy one part per 7 days while the close is above both its 150-day and 21-day average (max 4); sell all when the close is below the 150-day average.
-  1 part   CHANNEL : experiment (paper). Active only while close >= 150-day average. Channel [L, L*1.07]: buy near L, sell at U, stop 7% below L; if the price escapes the
+  1 part   CHANNEL : experiment (paper), BTC and SUI only (for ETH and BNB this part is idle cash). Active only while close >= 150-day average. Channel [L, L*1.07]: buy near L, sell at U, stop 7% below L; if the price escapes the
                      channel the part moves to the next channel. 
   2 parts  RESERVE : idle cash (the program has no tested rule for them).
 Signals use the close of day i, fills use the close of day i+1 (a real closed price). Fee 0.2% per fill. Part size is fixed at bucket/7 (profits and losses stay in their pool).
@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from regime import series, sma, load, iso, DAY, ROOT
 FEE, W, RV = 0.002, 0.07, 1
 COINS = ['BTC', 'ETH', 'BNB', 'SUI']
+CHANNEL_COINS = ('BTC', 'SUI')   # ETH and BNB channel removed 2026-11-27 (tested median 0.83/0.84 per year): their channel part stays idle cash
 CAPITAL = 1000.0
 CORE = CAPITAL / 3
 BUCKET = CAPITAL * 2 / 3 / 4
@@ -52,6 +53,8 @@ def step(st, coin, i, D, C, S21, S150, trades):
     elif a21 and T['parts'] < 4 and (T['parts'] == 0 or day - T['last_buy_day'] >= 7):
         T['pending'] = {'side': 'buy', 'amount': PART, 'why': 'uptrend part %d' % (T['parts'] + 1)}; T['last_buy_day'] = day
     # channel engine
+    if coin not in CHANNEL_COINS:
+        st['last_day'] = day; return
     if not a150:
         H['active'] = False; H['L'] = None
         if H['units'] > 0: H['pending'] = {'side': 'sell', 'why': 'trend off'}
@@ -95,7 +98,7 @@ def main():
         free = T['cash'] + H['cash'] + st['reserve']; eng = te + he
         rows.append({'coin': sym, 'close': float('%.6g' % c), 'engaged': round(eng, 2), 'free': round(free, 2), 'total': round(eng + free, 2),
                      'trend_parts': T['parts'], 'trend_value': round(te, 2), 'trend_pending': (T['pending'] or {}).get('side'),
-                     'chan_state': 'in' if H['units'] > 0 else ('on' if H['active'] else 'off'), 'chan_value': round(he + H['cash'], 2),
+                     'chan_state': 'none' if sym not in CHANNEL_COINS else ('in' if H['units'] > 0 else ('on' if H['active'] else 'off')), 'chan_value': round(he + H['cash'], 2),
                      'chan_L': float('%.6g' % H['L']) if H['L'] else None, 'chan_U': float('%.6g' % H['U']) if H['U'] else None, 'chan_pending': (H['pending'] or {}).get('side'),
                      'reserve': round(st['reserve'], 2), 'last_day': iso(D[-1]), 'sma150': float('%.6g' % S150[-1])})
         tot_e += eng; tot_f += free
