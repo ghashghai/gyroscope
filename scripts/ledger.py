@@ -22,6 +22,32 @@ def sym(j, name):
 def sma(a, n, i):
     return sum(a[i - n + 1:i + 1]) / n if i >= n - 1 else None
 
+def radar_fields(C, i, r):
+    """Daily version of what the page's radar shows for BTC (added 2026-11-27; NEW rows, and the first row back-filled with the same
+    no-look-ahead formulas and flagged radar_backfilled). Mirrors index.html: regime (4 states, close >= average incl. today) and
+    the danger points of trendMapCard (below 150d by >1%: +2, below 21d by >1%: +1, below 365d by >1%: +1, 30d <= -15% or else 7d <= -8%: +1,
+    lower highs and lower lows (30d vs prior 30d): +1, siren on: +3, crowded longs (funding7 >= FUND_HI or long accounts >= LSR_HI): +1)."""
+    c = C[i]; s150, s21, s365 = sma(C, 150, i), sma(C, 21, i), sma(C, 365, i)
+    out = {}
+    if s150 is None or s21 is None: return out
+    a150, a21 = c >= s150, c >= s21
+    out['regime'] = 'up' if a150 and a21 else 'pullback' if a150 else 'attempt' if a21 else 'down'
+    pts, why = 0, []
+    if c / s150 - 1 < -0.01: pts += 2; why.append('below150')
+    if c / s21 - 1 < -0.01: pts += 1; why.append('below21')
+    if s365 is not None and c / s365 - 1 < -0.01: pts += 1; why.append('below365')
+    if i >= 30:
+        r30 = c / C[i - 30] - 1; r7 = c / C[i - 7] - 1
+        if r30 <= -0.15: pts += 1; why.append('fall30')
+        elif r7 <= -0.08: pts += 1; why.append('fall7')
+    if i >= 59 and max(C[i - 29:i + 1]) < max(C[i - 59:i - 29]) and min(C[i - 29:i + 1]) < min(C[i - 59:i - 29]):
+        pts += 1; why.append('lower_hl')
+    if r.get('sirenA') or r.get('sirenB') or r.get('sirenC'): pts += 3; why.append('siren')
+    f7, lv = r.get('funding7'), r.get('lsr_long_pct')
+    if (f7 is not None and f7 >= FUND_HI) or (lv is not None and lv >= LSR_HI): pts += 1; why.append('crowded_longs')
+    out['danger_pts'] = pts; out['danger_why'] = why
+    return out
+
 def readings(day, C, D, liq, fund, lsr, ohl, whale, oi={}, usd={}):
     """all inputs are values up to and including `day` (closed). No look-ahead."""
     i = D.index(day)
@@ -117,6 +143,7 @@ def readings(day, C, D, liq, fund, lsr, ohl, whale, oi={}, usd={}):
     r['gscore'] = sum(gs) if gs else None
     # crowd (liquidation long share) has NO vote: in-sample its sign looked opposite to the naive reading (forced selling preceded rebounds, 3 episodes). Raw value is stored; sign to be judged on live data.
     r['votes'] = v
+    r.update(radar_fields(C, i, r))
     vs = [x for x in v.values() if x is not None]
     r['score'] = sum(vs) if vs else None
     return r
@@ -162,6 +189,13 @@ def main():
         row.update(readings(last, C, D, liq, fund, lsr, ohl, whale, oi, usd))
         L['rows'].append(row)
     for r in L['rows']:
+        if 'danger_pts' not in r and r['day'] in D:   # first row predates the radar fields: same formulas, data up to that day only
+            rr = readings(r['day'], C, D, liq, fund, lsr, ohl, None, oi, usd)
+            for k in ('regime', 'danger_pts', 'danger_why'):
+                if k in rr: r[k] = rr[k]
+            r['radar_backfilled'] = True
+            if 'Radar fields' not in L.get('rv_note', ''):
+                L['rv_note'] = L.get('rv_note', '') + ' Radar fields (regime, danger_pts, danger_why) were added 2026-11-27; rows written before that got them back-filled with the same no-look-ahead formulas (radar_backfilled=true); later rows freeze them on the day.'
         r.update(outcomes(r['day'], D, C))
     json.dump(L, open('ledger.json', 'w'), separators=(',', ':'))
     print('ledger rows', len(L['rows']), 'last', last)

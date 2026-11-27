@@ -41,7 +41,7 @@ button{background:var(--gold);color:var(--ink);border:0;border-radius:10px;paddi
 <div id="log"></div>
 <div id="out"></div>
 </div>
-<script src="scene.js?v=27"></script>
+<script src="scene.js?v=29"></script>
 <script src="siren.js?v=28"></script>
 <script>
 const COINS = ['BTC', 'ETH', 'BNB', 'SUI'];
@@ -320,11 +320,27 @@ function ledgerCard(L) {
   h += '<div class="verdict ' + (sc(last) <= -2 ? 'v-r' : sc(last) >= 1 ? 'v-g' : 'v-y') + '" style="margin-top:8px">آخرین ثبت (' + day(last) + '): چهار گروهِ مستقل — قیمت/روند ' + vt(g.price) + ' · اهرم و شلوغی ' + vt(g.leverage) + ' · نوسان ' + vt(g.volatility) + ' · مشارکت (حجم) ' + vt(g.participation) + ' → مجموع ' + sc(last) + ' (▲ نگه‌داشتن، ▼ هشدار، ■ خنثی). فقط ثبت می‌شود (رأی ندارد): سهم لانگِ لیکویید ' + f(last.liq_long_share30) + '، تغییر OI ۳۰ روزه ' + f(last.oi_chg30) + '، تغییر عرضهٔ USDT ' + f(last.usdt_supply_chg30) + '، کیف‌پول‌های سرد صرافی ' + (last.whale_cold_total ? Math.round(last.whale_cold_total).toLocaleString('en') + ' BTC' : '—') + '.</div>';
   h += '<div class="tw" style="margin-top:8px"><table><tr><th>روز</th><th>قیمت</th><th>مجموع</th><th>۷ روز بعد</th><th>۳۰ روز بعد</th><th>۹۰ روز بعد</th></tr>' +
     R.slice(-8).reverse().map((r) => '<tr><td>' + day(r) + '</td><td>' + Math.round(r.close).toLocaleString('en') + '</td><td>' + (sc(r) == null ? '—' : sc(r)) + '</td><td>' + f(r.fwd7) + '</td><td>' + f(r.fwd30) + '</td><td>' + f(r.fwd90) + '</td></tr>').join('') + '</table></div>';
-  const M = R.filter((r) => r.fwd30 != null && sc(r) != null);
-  if (M.length >= 20) {
-    const med = (a) => { a = a.slice().sort((x, y) => x - y); return a[Math.floor(a.length / 2)]; }, w = M.filter((r) => sc(r) < 0), g = M.filter((r) => sc(r) >= 0);
-    h += '<div style="margin-top:8px"><b>نتیجهٔ زنده تا امروز (' + M.length + ' روز رسیده):</b> رأی منفی (' + w.length + ' روز): میانهٔ ۳۰ روز بعد ' + (w.length ? pct(med(w.map((r) => r.fwd30))) : '—') + '؛ رأی غیرمنفی (' + g.length + ' روز): ' + (g.length ? pct(med(g.map((r) => r.fwd30))) : '—') + '.</div>';
-  } else h += '<div class="mut" style="margin-top:8px">نتیجهٔ زنده بعد از ۲۰ روزِ رسیده (حدود ۵۰ روز از شروع) نشان داده می‌شود؛ تا آن موقع عددی از خودم نمی‌سازم.</div>';
+  // ----- کارنامهٔ رادار از روی دفتر زنده: معیارها از ۲۰۲۶-۱۱-۲۷ ثابت‌اند و بعد از دیدن نتیجه عوض نمی‌شوند -----
+  const M = R.filter((r) => r.fwd30 != null && r.min30 != null && sc(r) != null), NEED = 20;
+  const first = R[0].day, ready = dstr((first + 50) * 86400);
+  h += '<h3 style="margin:12px 0 4px">کارنامهٔ رادار (از روی همین دفتر)</h3>';
+  h += '<div class="mut">معیارِ ثابت (از ۲۰۲۶-۱۱-۲۷؛ بعد از دیدن نتیجه عوض نمی‌شود): ۱) از روزهای هر گروه، چند درصد ظرف ۳۰ روز بعد دست‌کم ۱۰٪ زیرِ بستهٔ همان روز رفتند؛ ۲) میانهٔ بازده ۳۰ روز بعد. هر روز فقط یک ردیف است و روزهای کنار هم مستقل نیستند، پس عددهای کم‌نمونه را جدی نگیر.</div>';
+  if (M.length < NEED) {
+    h += '<div class="verdict v-y" style="margin-top:6px">هنوز زود است: ' + M.length + ' از ' + NEED + ' روزِ لازم، نتیجهٔ ۳۰ روزه دارد (از ' + R.length + ' روز ثبت‌شده). نخستین کارنامه حدود ' + ready + ' آماده می‌شود؛ ۹۰ روزه‌ها بعدتر. تا آن موقع هیچ عددی از خودم نمی‌سازم.</div>';
+  } else {
+    const med = (a) => { a = a.slice().sort((x, y) => x - y); return a[Math.floor(a.length / 2)]; };
+    const lvlOf = (r) => (r.danger_pts == null ? null : r.danger_pts >= 6 ? '۳) خطرناک (۶ نقطه یا بیشتر)' : r.danger_pts >= 3 ? '۲) مراقب (۳ تا ۵ نقطه)' : '۱) عادی یا کمی نگران (۰ تا ۲ نقطه)');
+    const RN = { up: '۱) صعودی', pullback: '۲) صعودی، در اصلاح', attempt: '۳) تلاش برای تغییر روند', down: '۴) نزولی' };
+    const gl = (r) => (sc(r) <= -2 ? '۳) امتیاز گروه‌ها −۲ یا کمتر (هشدار)' : sc(r) >= 1 ? '۱) امتیاز گروه‌ها +۱ یا بیشتر' : '۲) امتیاز گروه‌ها −۱ تا ۰');
+    const table = (title, key) => {
+      const g = {}; for (const r of M) { const k = key(r); if (k) (g[k] = g[k] || []).push(r); }
+      const ks = Object.keys(g).sort(); if (!ks.length) return '';
+      return '<div class="tw" style="margin-top:6px"><table><tr><th>' + title + '</th><th>روز</th><th>ظرف ۳۰ روز ≥۱۰٪ افت</th><th>میانهٔ ۳۰ روز بعد</th></tr>' + ks.map((k) => { const a = g[k]; return '<tr><td>' + k + '</td><td>' + a.length + (a.length < 10 ? ' <span class="mut">(کم‌نمونه)</span>' : '') + '</td><td>' + pct(a.filter((r) => r.min30 <= -0.1).length / a.length) + '</td><td>' + pct(med(a.map((r) => r.fwd30))) + '</td></tr>'; }).join('') + '</table></div>';
+    };
+    h += '<div style="margin-top:6px"><b>' + M.length + ' روز</b> نتیجهٔ ۳۰ روزه دارند. پایهٔ همهٔ این روزها: ' + pct(M.filter((r) => r.min30 <= -0.1).length / M.length) + ' افت ≥۱۰٪، میانهٔ ۳۰ روز ' + pct(med(M.map((r) => r.fwd30))) + '.</div>';
+    h += table('سطح خطرِ رادار', (r) => lvlOf(r)) + table('رژیم', (r) => RN[r.regime]) + table('اتحاد اندیکاتورها (چهار گروه)', gl);
+    h += '<div class="mut" style="margin-top:6px">خواندنش: اگر رادار کار می‌کند، گروه «خطرناک» باید بیشترین افت و کمترین میانه را داشته باشد و گروه «عادی» برعکس. اگر ترتیب به‌هم‌ریخته بود، همان را باید صادقانه گفت.</div>';
+  }
   h += '<details style="margin-top:8px"><summary><b>کمبود رادار کجا بود؟ (آزمون ۱۲ اندیکاتور روی دادهٔ واقعی BTC، ۲۰۱۳ تا ۲۰۲۶)</b></summary><div class="mut" style="margin-top:6px">' +
     '<b>روش:</b> هر اندیکاتور را در دو حالت «بالای میانگین ۱۵۰» و «زیر آن» جدا سنجیدم و دیدم اثرش در هر دو نیمهٔ تاریخ هم‌جهت می‌ماند یا نه.<br>' +
     '<b>۱) اهرم و شلوغی (نرخ فاندینگ ۷ روزه، سهم لانگ حساب‌ها):</b> احتمال افت ۲۰٪ در ۹۰ روز بعد: فاندینگ بالا ۵۱٪ در برابر ۲۲٪ فاندینگ پایین (زیر روند)؛ سهم لانگ بالا ۴۰٪ در برابر ۱۶٪ (بالای روند) و ۴۵٪ در برابر ۳۶٪ (زیر روند). فاندینگِ بالای روند ناپایدار بود؛ بقیه در هر دو نیمه همسو. رادار این را اصلاً نمی‌دید.<br>' +
@@ -428,6 +444,36 @@ function radarCard(SM, aux, oh1, lq1, macro, ohD, meta) {
     '<h3 style="margin:10px 0 4px">نقدینگی</h3>' + (liqHtml ? '<div class="tw"><table><tr><th>شاخص</th><th>اکنون</th><th>۳۰ روز</th><th>۹۰ روز</th><th></th><th>تازگی</th></tr>' + liqHtml + '</table></div>' : '') +
     (fredMissing ? '<div class="mut" style="margin-top:4px">ترازنامهٔ کل فدرال (برای «نقدینگی خالص») از منبع رایگانش نیامد؛ به‌جایش دو جزء آن، TGA و RRP، جدا نشان داده می‌شوند. عدد ساختگی نمی‌گذارم.</div>' : '') +
     '<div class="mut" style="margin-top:8px"><b>صادقانه:</b> فقط عامل‌های «آزموده ✔» در گذشتهٔ BTC سنجیده شده‌اند (و آستانه‌هایشان درون‌نمونه‌ای است)؛ نقدینگی کلان و دلار قاعدهٔ کلاسیکند و اینجا هنوز آزموده نشده‌اند. این بیلان وضعیت را می‌خواند، سفارش نمی‌دهد؛ تصمیم‌گیر همچنان «فرمان» است.</div></div>';
+}
+// ---------- تغییر رژیم: خط زمانی (scripts/regime.py → regime.json) ----------
+function regimeCard(RG) {
+  const NAME = { up: 'صعودی', pullback: 'صعودی، در اصلاح', attempt: 'تلاش برای تغییر روند', down: 'نزولی' };
+  const SIDE = { up: 1, pullback: 0, attempt: 0, down: -1 };
+  const colr = (x) => (x > 0 ? 'color:#5fe0a0' : x < 0 ? 'color:#ff6b6b' : 'color:#e0c060');
+  const d2 = (d) => new Date(d * 86400000).toISOString().slice(0, 10);
+  if (!RG || !RG.events || !RG.current) return '<div class="card"><h2>تغییر رژیم — خط زمانی</h2><div class="mut">فایل خط زمانی (regime.json) هنوز در مخزن نیست؛ بعد از اولین اجرای اکشنز می‌آید. چیزی از خودم نمی‌سازم.</div></div>';
+  const ev = RG.events, cur = RG.current, ld = RG.last_day || {};
+  const price = (p) => (p >= 100 ? Math.round(p).toLocaleString('en') : p >= 1 ? p.toFixed(2) : p.toFixed(4));
+  const above = (e) => e.to === 'up' || e.to === 'pullback';
+  const cross = (e) => '<span style="' + colr(above(e) ? 1 : -1) + '">' + (above(e) ? 'بالای ۱۵۰ روزه (به نفع صعود)' : 'زیر ۱۵۰ روزه (به نفع ریزش)') + '</span>';
+  const coins = COINS.filter((s) => cur[s]);
+  const rows = coins.map((s) => {
+    const c = cur[s], L = ld[s] || 0, mine = ev.filter((e) => e.coin === s), r90 = mine.filter((e) => e.day > L - 90), m90 = r90.filter((e) => e.major).length;
+    const lm = mine.filter((e) => e.major).pop();
+    return '<tr><td><b>' + s + '</b></td><td style="' + colr(SIDE[c.regime]) + '"><b>' + NAME[c.regime] + '</b></td><td>' + c.days_in + ' روز<br><span class="mut">' + c.since + '</span></td><td>' + r90.length + ' تغییر<br><span class="mut">' + m90 + ' بزرگ</span></td><td>' + (lm ? cross(lm) + '<br><span class="mut">' + d2(lm.day) + '</span>' : '—') + '</td></tr>';
+  }).join('');
+  const sides = coins.map((s) => SIDE[cur[s].regime]), nd = sides.filter((x) => x < 0).length, nu = sides.filter((x) => x > 0).length;
+  const last = ev.length ? ev.slice().sort((a, b) => b.day - a.day)[0] : null;
+  const head = coins.length ? (nd === coins.length ? 'همهٔ ' + coins.length + ' ارز الان «نزولی»اند' : nu === coins.length ? 'همهٔ ' + coins.length + ' ارز الان «صعودی»اند' : nd + ' ارز نزولی، ' + nu + ' ارز صعودی، بقیه در حالت میانی') + '. ' : '';
+  const headTxt = head + (last ? 'آخرین تغییر ثبت‌شده: ' + last.coin + ' در ' + d2(last.day) + ' از «' + NAME[last.from] + '» به «' + NAME[last.to] + '»' + (last.major ? ' (عبور از میانگین ۱۵۰ روزه)' : ' (فقط خط ۲۱ روزه)') + '.' : '');
+  const vcls = coins.length && nd === coins.length ? 'v-r' : coins.length && nu === coins.length ? 'v-g' : 'v-y';
+  const recent = ev.slice().sort((a, b) => b.day - a.day || a.coin.localeCompare(b.coin)).slice(0, 10).map((e) => '<tr><td>' + d2(e.day).slice(2) + '<br><b>' + e.coin + '</b></td><td>' + (e.major ? '<b>⚑ بزرگ</b> (عبور از ۱۵۰)' : '<span class="mut">کوچک (فقط ۲۱ روزه)</span>') + '<br>از «' + NAME[e.from] + '»<br>به «<span style="' + colr(SIDE[e.to]) + '">' + NAME[e.to] + '</span>»</td><td>' + price(e.close) + '</td><td class="mut">' + (e.live ? 'زنده<br>' + new Date(e.seen_at * 1000).toISOString().slice(5, 16).replace('T', ' ') : 'تاریخچه') + '</td></tr>').join('');
+  const b = ev.filter((e) => e.coin === 'BTC'), bMaj = b.filter((e) => e.major).length, nLive = ev.filter((e) => e.live).length;
+  return '<div class="card"><h2>تغییر رژیم — خط زمانی</h2><div class="verdict ' + vcls + '">' + headTxt + '</div>' +
+    '<div class="mut" style="margin-top:4px">رژیم = جای بستهٔ روزانه نسبت به میانگین ۲۱ و ۱۵۰ روزه: «صعودی» بالای هر دو، «صعودی، در اصلاح» بالای ۱۵۰ ولی زیر ۲۱، «تلاش برای تغییر روند» زیر ۱۵۰ ولی بالای ۲۱، «نزولی» زیر هر دو. هر بار عوض شود اینجا ثبت می‌شود.</div>' +
+    '<h3 style="margin:10px 0 4px">وضع هر ارز</h3><div class="tw"><table><tr><th>ارز</th><th>رژیم اکنون</th><th>مدت</th><th>۹۰ روز اخیر</th><th>آخرین عبور از ۱۵۰</th></tr>' + rows + '</table></div>' +
+    '<h3 style="margin:10px 0 4px">۱۰ تغییر آخر</h3><div class="tw"><table><tr><th>روزِ بسته‌شدن</th><th>تغییر</th><th>قیمت بسته</th><th>منبع</th></tr>' + recent + '</table></div>' +
+    '<div class="mut" style="margin-top:8px"><b>صادقانه:</b> رژیم روی بستهٔ روزانه است (ساعت ۰۰:۰۰ UTC = ۰۳:۳۰ تهران)، پس تغییر فقط در پایان روز رخ می‌دهد و کار ساعتیِ مخزن اولین ساعتِ بعد از آن آن را «زنده» ثبت می‌کند (با زمان ثبت، UTC). «تاریخچه» یعنی بعداً از قیمت‌های گذشته (از ۲۰۱۷) بازسازی شده، نه اینکه آن موقع زنده دیده باشیم؛ تا حالا ' + nLive + ' تغییر زنده ثبت شده است. ' + (b.length ? 'نمونه: BTC از ۲۰۱۷ ' + (b.length - bMaj) + ' تغییر کوچک و ' + bMaj + ' تغییر بزرگ داشته؛ خط ۲۱ روزه پر از رفت‌وبرگشت است و فقط عبور از ۱۵۰ روزه در گذشتهٔ BTC آزموده شده است. ' : '') + 'این خط زمانی چیزی را پیش‌بینی نمی‌کند؛ فقط ثبتِ آنچه رخ داده است.</div></div>';
 }
 // ---------- نقشهٔ روند: کدام تایم‌فریم ریزشی است + سطح خطر + خط روند ماهانه ----------
 const TM = { monthly: null };
@@ -774,6 +820,7 @@ async function run() {
   try {
     const q = '?ts=' + Date.now();
     const whP = getJSON('./whale.json' + q).catch(() => null), ldP = getJSON('./ledger.json' + q).catch(() => null), h1P = getJSON('./ohlcv1h.json' + q).catch(() => null), l1P = getJSON('./liq1h.json' + q).catch(() => null), mcP = getJSON('./macro.json' + q).catch(() => null);
+    const rgP = getJSON('./regime.json' + q).catch(() => null);
     const [meta, oh, liq, oi, fu, ls, price, onch] = await Promise.all(['meta', 'ohlcv', 'liq', 'oi', 'funding', 'lsr', 'price', 'onchain'].map((f) => getJSON('./' + f + '.json' + q).catch((e) => { log('نیامد: ' + f, 'dn'); return null; })));
     if (!oh) throw new Error('داده قیمت هنوز در مخزن نیست');
     log('داده به‌روز شده: ' + new Date(meta.fetched * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC');
@@ -798,7 +845,8 @@ async function run() {
     if (btc) { const mvh = mvrvCard(btc, onch); cmd = commandCard(btc, btcSt, sirenSt); html += mvh + partsCard(btc) + swingCard(btc) + simCard(); }
     let radar = ''; try { radar = radarCard(SM, aux, await h1P, await l1P, await mcP, oh, meta); } catch (e) { radar = '<div class="card"><h2>رادار</h2><div class="mut">خطا: ' + e.message + '</div></div>'; }
     let tmap = ''; try { tmap = trendMapCard(SM, aux, await h1P, sirenSt); } catch (e) { tmap = '<div class="card"><h2>نقشهٔ روند</h2><div class="mut">خطا: ' + e.message + '</div></div>'; }
-    $('out').innerHTML = tmap + radar + cmd + whoLostCard(SM, aux) + whaleCard(oh, onch, await whP) + ledgerCard(await ldP) + html; drawTrendMap(); drawCommand(); drawSwing(); drawSim();
+    let regime = ''; try { regime = regimeCard(await rgP); } catch (e) { regime = '<div class="card"><h2>تغییر رژیم</h2><div class="mut">خطا: ' + e.message + '</div></div>'; }
+    $('out').innerHTML = tmap + radar + regime + cmd + whoLostCard(SM, aux) + whaleCard(oh, onch, await whP) + ledgerCard(await ldP) + html; drawTrendMap(); drawCommand(); drawSwing(); drawSim();
   } catch (e) { log('خطا: ' + e.message, 'dn'); }
   $('go').disabled = false;
 }

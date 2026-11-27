@@ -6,6 +6,12 @@
   const cg = document.getElementById('gl'), cf = document.getElementById('fx'), fx = cf.getContext('2d');
   const reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  /* Quality levels (LV 0 best .. 3 lightest). The frame governor in frame() measures real frame time on this device and
+     steps down if it is slow; the level is remembered for 3 days. ?q=0..3 forces a level for testing (governor off). */
+  const GS = [Math.min(.75, DPR * .45), .5, .36, .26];
+  let LV = 0, forced = false;
+  try { const s = JSON.parse(localStorage.getItem('gyroQ') || 'null'); if (s && s.lv >= 0 && s.lv <= 3 && Date.now() - s.t < 3 * 864e5) LV = s.lv | 0; } catch (e) { }
+  try { const m = /[?&]q=([0-3])(?!\d)/.exec(location.search); if (m) { LV = +m[1]; forced = true; } } catch (e) { }
   let W = 360, H = 320, alertT = 0, alertK = 0, yaw = 0.5, pitch = -0.32, vy = 0, vp = 0, drag = false, px = 0, py = 0, visible = true;
   const T0 = Math.random() * 1000;
 
@@ -118,7 +124,7 @@ void main(){
   /* ---------- gyroscope ---------- */
   const items = [];
   function ring(F, rad, tube, ticks) {
-    const N = 84; let prev = null;
+    const N = LV >= 2 ? 48 : 84; let prev = null;
     for (let i = 0; i <= N; i++) {
       const th = i / N * 2 * PI, c = cos(th), s = sin(th);
       const P = proj(mv(F, [rad * c, rad * s, 0])), nrm = mv(F, [c, s, 0]);
@@ -128,6 +134,7 @@ void main(){
       prev = P;
     }
     if (ticks) for (let j = 0; j < 72; j++) {
+      if (LV >= 2 && j % 6) continue;
       const th = j * PI / 36, c = cos(th), s = sin(th), long = j % 6 === 0, r1 = long ? .85 : .9, r2 = 1 - tube * 1.1;
       const A = proj(mv(F, [r1 * c, r1 * s, 0])), B = proj(mv(F, [r2 * c, r2 * s, 0]));
       items.push({ k: 1, z: (A.z + B.z) / 2, x1: A.x, y1: A.y, x2: B.x, y2: B.y, w: long ? 1.7 : 1, col: long ? 'rgba(255,226,150,.9)' : 'rgba(240,200,110,.55)' });
@@ -226,9 +233,9 @@ void main(){
     g.addColorStop(0, alertK > .5 ? 'rgba(255,70,60,.20)' : 'rgba(70,170,255,.20)'); g.addColorStop(.5, alertK > .5 ? 'rgba(255,60,50,.07)' : 'rgba(60,255,160,.06)'); g.addColorStop(1, 'rgba(0,0,0,0)');
     fx.fillStyle = g; fx.fillRect(0, 0, W, H);
     fx.globalCompositeOperation = 'source-over';
-    silk(t);
-    const near = [];
-    for (const c of CR) { const zc = Math.sin(c.a + t * c.sp) * c.rz; if (zc < 0) crystal(c, t, V); else near.push(c); }
+    if (LV < 2) silk(t);
+    const near = [], nCr = LV >= 3 ? 4 : LV >= 2 ? 6 : CR.length;
+    for (let ci = 0; ci < nCr; ci++) { const c = CR[ci]; const zc = Math.sin(c.a + t * c.sp) * c.rz; if (zc < 0) crystal(c, t, V); else near.push(c); }
     // gimbals: outer (spins about Y) -> middle (about its X) -> inner (about its Y) -> rotor (about X)
     const a1 = t * .28, a2 = .75 * sin(t * .37) + .25, a3 = .65 * sin(t * .29 + 1.3), a4 = t * 7.5;
     const F1 = mm(V, Ry(a1)), F2 = mm(F1, Rx(a2)), F3 = mm(F2, Ry(a3));
@@ -243,7 +250,9 @@ void main(){
     for (const it of items) drawItem(it);
     // dust of quartz
     fx.globalCompositeOperation = 'lighter';
-    for (const d of DUST) {
+    const nD = LV >= 2 ? 30 : DUST.length;
+    for (let di = 0; di < nD; di++) {
+      const d = DUST[di];
       const a = d.a + t * d.sp, v = mv(V, [d.r * cos(a), d.r * sin(a) * sin(d.inc), d.r * sin(a) * cos(d.inc)]), P = proj(v), tw = .5 + .5 * sin(t * 2 + d.tw);
       fx.fillStyle = alertK > .5 ? 'rgba(255,130,120,' + (.2 + .6 * tw).toFixed(2) + ')' : d.g ? 'rgba(130,255,170,' + (.2 + .6 * tw).toFixed(2) + ')' : 'rgba(190,235,255,' + (.2 + .6 * tw).toFixed(2) + ')';
       fx.fillRect(P.x, P.y, 1.3 + (v[2] > 0 ? .8 : 0), 1.3 + (v[2] > 0 ? .8 : 0));
@@ -256,13 +265,32 @@ void main(){
   /* ---------- loop, size, input ---------- */
   function resize() {
     const r = hero.getBoundingClientRect(); W = Math.max(220, Math.round(r.width)); H = Math.max(200, Math.round(r.height));
-    cf.width = Math.round(W * DPR); cf.height = Math.round(H * DPR); fx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    const gs = Math.min(.75, DPR * .45); cg.width = Math.round(W * gs); cg.height = Math.round(H * gs); if (gl) gl.viewport(0, 0, cg.width, cg.height);
+    const d2 = LV >= 2 ? 1 : DPR;
+    cf.width = Math.round(W * d2); cf.height = Math.round(H * d2); fx.setTransform(d2, 0, 0, d2, 0, 0);
+    const gs = GS[LV]; cg.width = Math.round(W * gs); cg.height = Math.round(H * gs); if (gl) gl.viewport(0, 0, cg.width, cg.height);
   }
-  let last = performance.now(), tt = 0;
+  let last = performance.now(), tt = 0, gAcc = 0, gCnt = 0, gWarm = 0, gT = 0, gM = 0, flip = 0;
+  const gReset = () => { gWarm = 0; gAcc = 0; gCnt = 0; gT = 0; gM = 0; };
   function frame(now) {
     requestAnimationFrame(frame);
-    if (!visible || document.hidden) { last = now; return; }
+    if (!visible || document.hidden) { last = now; gAcc = 0; gCnt = 0; gM = 0; return; }
+    if (LV >= 3) { flip ^= 1; if (flip) return; }              // lightest level: draw every other frame (~30 fps)
+    const raw = now - last;
+    // governor: ignore the warm-up (first 15 frames or 2.5 s: shader compile), then measure real frame time over 40 frames
+    // (or 4 s if frames are very slow). If the average is above 38 ms (slower than ~26 fps) go one level lighter.
+    // A phone in battery-saver (capped at 30 fps = 33 ms) stays put. Frames after a hidden tab are not counted (last reset above).
+    if (!forced && LV < 3) {
+      if (!gT) gT = now;
+      if (gWarm < 15 && now - gT < 2500) gWarm++;
+      else {
+        if (!gM) gM = now;
+        gAcc += Math.min(raw, 1000); gCnt++;
+        if (gCnt >= 40 || (gCnt >= 4 && now - gM > 4000)) {
+          const avg = gAcc / gCnt; gAcc = 0; gCnt = 0; gM = 0;
+          if (avg > 38) { LV++; gReset(); try { localStorage.setItem('gyroQ', JSON.stringify({ lv: LV, t: Date.now() })); } catch (e) { } resize(); try { console.info('scene quality ->', LV, 'avg ms', avg.toFixed(1)); } catch (e) { } }
+        }
+      }
+    }
     const dt = Math.min(.05, (now - last) / 1000); last = now; tt += dt * (reduce ? .3 : 1);
     alertK += (alertT - alertK) * Math.min(1, dt * 2.5);
     if (!drag) { yaw += vy * dt; pitch = clamp(pitch + vp * dt, -1.2, 1.2); vy *= .94; vp *= .94; yaw += dt * .05; }
@@ -274,5 +302,5 @@ void main(){
   const up = () => { drag = false; }; hero.addEventListener('pointerup', up); hero.addEventListener('pointercancel', up);
   if ('IntersectionObserver' in window) new IntersectionObserver((es) => { visible = es[0].isIntersecting; }).observe(hero);
   window.addEventListener('resize', resize); resize(); requestAnimationFrame(frame);
-  window.Scene = { setAlert(on) { alertT = on ? 1 : 0; } };
+  window.Scene = { setAlert(on) { alertT = on ? 1 : 0; }, quality() { return LV; } };
 })();
