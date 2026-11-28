@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مانور ژیروسکوپ</title>
+<style>
+:root{--bg:#070b12;--card:#101826;--line:#22304a;--tx:#e6edf7;--mut:#8ea0bb;--gold:#e8c46a;--red:#ff5a4d;--grn:#5fd39a;--amb:#f0b34a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:Tahoma,system-ui,sans-serif;line-height:1.9;font-size:15px}
+.w{max-width:600px;margin:0 auto;padding:14px}
+h1{font-size:19px;margin:4px 0;color:var(--gold)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:10px 0}
+.mut{color:var(--mut);font-size:13px}.warn{color:var(--amb);font-size:12px}
+.up{color:var(--grn)}.dn{color:var(--red)}.am{color:var(--amb)}
+canvas{width:100%;display:block;background:#0b1220;border-radius:10px;touch-action:none}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.btns button{background:#0b1220;color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-family:inherit;font-size:13px}
+.btns button:active{border-color:var(--gold)}
+input[type=range]{width:100%;direction:ltr}
+.big{font-size:20px;font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:13px}td{padding:4px 2px;border-top:1px solid var(--line)}td.n{direction:ltr;text-align:left;white-space:nowrap}
+.gr{display:flex;align-items:center;gap:4px;margin:4px 0;direction:ltr}.gr b{width:34px;font-size:12px}
+.gc{width:34px;height:30px;border-radius:7px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--mut);background:#0b1220}
+.gc.in{background:var(--amb);color:#111;border-color:var(--amb);font-weight:700}.gc.w{border-style:dashed}.gc.res{background:#16223a}.gc.on{border-color:var(--grn);color:var(--grn)}
+.bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:#0b1220;margin:6px 0}
+a{color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="w">
+<h1>مانور ژیروسکوپ <span class="mut" style="font-size:12px">(پول و قیمت فرضی)</span></h1>
+<div class="mut"><a href="index.html">← صفحهٔ اصلی</a> · قیمت آینده را با انگشت روی نمودار بکش (بخش راستِ خط عمودی «امروز»)، برنامه همان قاعده‌های واقعی را روی آن اجرا می‌کند. (برای اسکرول صفحه، انگشت را بیرون از نمودار بکش.)</div>
+
+<div class="card">
+  <canvas id="cv" data-h="270" style="height:270px"></canvas>
+  <div class="mut" id="hint" style="margin-top:4px"></div>
+  <div class="btns" id="presets">
+    <button data-p="flat">صاف (بدون حرکت)</button>
+    <button data-p="A">الف: ۶۰ تا ۸۶</button>
+    <button data-p="B">ب: ۴۲، ۳۸، رنج ۳۲–۳۸</button>
+    <button data-p="C">ج: بالا، افت، بالا</button>
+    <button data-p="D">د: شیب تند، اصلاح</button>
+  </div>
+  <div class="btns">
+    <button id="up10">از روز انتخابی +۱۰٪</button><button id="dn10">از روز انتخابی −۱۰٪</button><button id="up30">+۳۰٪</button><button id="dn30">−۳۰٪</button>
+  </div>
+  <div class="mut">روز انتخابی: <b id="dlab"></b></div>
+  <input type="range" id="day" min="0" max="365" value="0">
+</div>
+
+<div class="card" id="out"></div>
+<div class="card"><div class="mut" style="margin-bottom:4px">ارزش کل حساب در طول زمان (خط سفید) در برابر نگه‌داشتن (خط‌چین)</div><canvas id="eq" data-h="130" style="height:130px"></canvas></div>
+<div class="card"><div class="mut">آخرین معامله‌ها تا روز انتخابی</div><table id="tr"></table></div>
+<div class="card warn">همه‌چیز فرضی است: مسیر قیمت را خودت می‌کشی و پیش‌بینی نیست. فرض: سه ارز دیگر با همان درصد بیت‌کوین حرکت می‌کنند (در واقع جدا حرکت می‌کنند، پس این فقط برای دیدن رفتار قاعده‌هاست). معامله‌ها با قیمت بستهٔ روز بعد و کارمزد ۰٫۲٪. گذشته‌ی نمودار (سمت چپ) واقعی است.</div>
+</div>
+<script>
+'use strict';
+const q = '?t=' + Math.floor(Date.now() / 600000);
+const fa = (x) => String(x).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[d]);
+const nf = (x) => x >= 100 ? fa(Math.round(x).toLocaleString('en-US')) : fa(x.toFixed(x >= 10 ? 2 : 3)).replace('.', '٫');
+const rd = (x) => x >= 100 ? String(Math.round(x)) : x.toFixed(x >= 10 ? 2 : 3);
+const pc = (x, d) => (x >= 0 ? '+' : '−') + fa(Math.abs(x * 100).toFixed(d == null ? 0 : d)).replace('.', '٫') + '٪';
+const usd = (x) => fa(Math.round(x).toLocaleString('en-US')) + ' دلار';
+async function getJSON(u) { const r = await fetch(u); if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }
+function smaArr(a, n) { const o = new Float64Array(a.length).fill(NaN); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+function buildSeries(sym, oh, price, todayDay) {
+  const s = (oh.data || []).find((x) => String(x.symbol).startsWith(sym)); if (!s) return null;
+  const rows = [];
+  if (sym === 'BTC' && price) { const first = Math.floor(s.history[0].t / 86400); for (const r of price.rows) { const dd = Math.floor(r[0] / 86400); if (dd < first) rows.push({ d: dd, c: r[1] }); } }
+  for (const x of s.history) { const dd = Math.floor(x.t / 86400); if (dd < todayDay) rows.push({ d: dd, c: x.c }); }
+  rows.sort((a, b) => a.d - b.d);
+  const out = [];
+  for (const r of rows) { while (out.length && r.d - out[out.length - 1].d > 1 && r.d - out[out.length - 1].d < 6) out.push({ d: out[out.length - 1].d + 1, c: out[out.length - 1].c }); out.push(r); }
+  return { d: out.map((x) => x.d), c: out.map((x) => x.c) };
+}
+// ============ موتور برنامه (همان قاعده‌های book.py) ============
+const FEE = 0.002, WD = 0.07, CAP = 1000, CORE = CAP / 3, BUCKET = CAP * 2 / 3 / 4, PART = BUCKET / 7, CHC = ['BTC', 'SUI'], COINS = ['BTC', 'ETH', 'BNB', 'SUI'];
+function newCoin() { return { T: { cash: 4 * PART, units: 0, parts: 0, lastBuy: -99, pend: null }, H: { cash: PART, units: 0, L: null, U: null, active: false, pend: null }, res: 2 * PART }; }
+function fill(pool, c, tr, coin, eng, i) {
+  const p = pool.pend; if (!p) return;
+  if (p.side === 'buy') { const sp = Math.min(p.amount != null ? p.amount : pool.cash, pool.cash / (1 + FEE)); if (sp > 1e-9) { pool.units += sp / c; pool.cash -= sp * (1 + FEE); if (eng === 'trend') pool.parts++; tr.push({ coin, eng, i, side: 'buy', price: c, amt: sp, why: p.why }); } }
+  else if (pool.units > 0) { const got = pool.units * c * (1 - FEE); tr.push({ coin, eng, i, side: 'sell', price: c, amt: got, why: p.why }); pool.cash += got; pool.units = 0; if (eng === 'trend') pool.parts = 0; }
+  pool.pend = null;
+}
+function step(st, coin, i, C, S21, S150, tr) {
+  const c = C[i], a150 = c >= S150[i], a21 = c >= S21[i], T = st.T, H = st.H;
+  fill(T, c, tr, coin, 'trend', i); fill(H, c, tr, coin, 'channel', i);
+  if (!a150) { if (T.units > 0) T.pend = { side: 'sell', why: 'زیر خط ۱۵۰' }; }
+  else if (a21 && T.parts < 4 && (T.parts === 0 || i - T.lastBuy >= 7)) { T.pend = { side: 'buy', amount: PART, why: 'قسمت روند ' + (T.parts + 1) }; T.lastBuy = i; }
+  if (CHC.indexOf(coin) < 0) return;
+  if (!a150) { H.active = false; H.L = null; if (H.units > 0) H.pend = { side: 'sell', why: 'روند خاموش' }; }
+  else {
+    H.active = true; if (H.L == null) { H.L = c / (1 + WD / 2); H.U = H.L * (1 + WD); }
+    if (H.units === 0) { while (c > H.U) { H.L = H.U; H.U = H.L * (1 + WD); } while (c < H.L * (1 - WD)) { H.U = H.L; H.L = H.U / (1 + WD); } if (c <= H.L * 1.01 && c >= H.L * (1 - WD)) H.pend = { side: 'buy', why: 'کف کانال' }; }
+    else if (c >= H.U) { H.pend = { side: 'sell', why: 'سقف کانال' }; H.L = H.U; H.U = H.L * (1 + WD); }
+    else if (c <= H.L * (1 - WD)) { H.pend = { side: 'sell', why: 'حد ضرر کانال' }; H.U = H.L; H.L = H.U / (1 + WD); }
+  }
+}
+// run: arrays per coin (full series incl. future), start index i0 (today), end index n-1
+function runEngine(ser, i0, n) {
+  const st = {}, tr = [], S21 = {}, S150 = {}; for (const k of COINS) { st[k] = newCoin(); S21[k] = smaArr(ser[k], 21); S150[k] = smaArr(ser[k], 150); }
+  const snap = [];
+  for (let i = i0; i < n; i++) {
+    let eng = 0, free = CORE; const cs = {};
+    for (const k of COINS) {
+      step(st[k], k, i, ser[k], S21[k], S150[k], i === i0 ? [] : tr);
+      const c = ser[k][i], T = st[k].T, H = st[k].H;
+      eng += (T.units + H.units) * c; free += T.cash + H.cash + st[k].res;
+      cs[k] = { tp: T.parts, ch: CHC.indexOf(k) < 0 ? 'none' : (H.units > 0 ? 'in' : H.active ? 'on' : 'off'), L: H.L, U: H.U, need: Math.max(S150[k][i], S21[k][i]), s150: S150[k][i] };
+    }
+    snap.push({ eng, free, total: eng + free, cs });
+  }
+  return { snap, tr, S21: S21.BTC, S150: S150.BTC };
+}
+// ============ داده و مسیرها ============
+let HIST = 600, FUT = 365, SER = null, P0 = 0, PATH = null, I0 = 0, RES = null, FIB = [], SEL = 0, GROW = null;
+function presets(name) {
+  const lin = (a, b, n) => Array.from({ length: n }, (_, k) => a + (b - a) * (k + 1) / n), p0 = P0; let x = [];
+  if (name === 'flat') x = Array(FUT).fill(p0);
+  else if (name === 'A') x = lin(p0, 86000, 90).concat(Array(FUT - 90).fill(86000));
+  else if (name === 'B') { x = lin(p0, 42000, 30).concat(lin(42000, 38000, 3)); const m = x.length; for (let t = 0; t < FUT - m; t++) x.push(35000 + 3000 * Math.cos(2 * Math.PI * t / 60)); }
+  else if (name === 'C') { x = lin(p0, p0 * 1.25, 90); x = x.concat(lin(x[x.length - 1], x[x.length - 1] * 0.85, 30)); x = x.concat(lin(x[x.length - 1], x[x.length - 1] * 1.4, 120)); while (x.length < FUT) x.push(x[x.length - 1]); }
+  else if (name === 'D') { for (let k = 0; k < 150; k++) x.push(p0 * Math.pow(1.0025, k + 1)); x = x.concat(lin(x[x.length - 1], x[x.length - 1] * 0.8, 20)); while (x.length < FUT) x.push(x[x.length - 1] * 1.0025); }
+  return x.slice(0, FUT);
+}
+function recompute() {
+  const ser = {};
+  for (const k of COINS) { const h = GROW.S[k]; if (!h) continue; const base = h.c.slice(-HIST), last = base[base.length - 1]; ser[k] = base.concat(PATH.map((p) => last * p / P0)); }
+  SER = ser; I0 = HIST - 1; RES = runEngine(ser, I0, HIST + FUT); render();
+}
+// ============ رسم ============
+const cv = document.getElementById('cv'), eq = document.getElementById('eq');
+const VIEW_H = 150;                 // روزهای واقعی نمایش‌داده‌شده
+const LG = [Math.log(1), 0];       // محدودهٔ y در render
+let YMIN = 0, YMAX = 0;
+function geom(c) { const W = c.clientWidth || 340, H = +c.dataset.h; return { W, H, L: 6, R: 52, T: 8, B: 18 }; }
+function dayX(g, d) { return g.L + (g.W - g.L - g.R) * (d + VIEW_H) / (VIEW_H + FUT); }
+function xDay(g, x) { return (x - g.L) / (g.W - g.L - g.R) * (VIEW_H + FUT) - VIEW_H; }
+function priceY(g, p) { return g.T + (g.H - g.T - g.B) * (1 - (Math.log(p) - Math.log(YMIN)) / (Math.log(YMAX) - Math.log(YMIN))); }
+function yPrice(g, y) { const f = 1 - (y - g.T) / (g.H - g.T - g.B); return Math.exp(Math.log(YMIN) + Math.max(0, Math.min(1, f)) * (Math.log(YMAX) - Math.log(YMIN))); }
+function setup(c) { const dpr = Math.min(window.devicePixelRatio || 1, 2), g = geom(c); c.width = g.W * dpr; c.height = g.H * dpr; const x = c.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, g.W, g.H); x.font = '10px Tahoma,sans-serif'; x.direction = 'ltr'; x.textAlign = 'left'; return { x, g }; }
+function drawMain() {
+  const { x, g } = setup(cv), c = SER.BTC, n = c.length, lo = I0 - VIEW_H;
+  const pw = g.W - g.L - g.R;
+  // fib
+  x.textBaseline = 'middle';
+  x.strokeStyle = '#e8c46a'; x.setLineDash([5, 4]); x.fillStyle = '#e8c46a';
+  FIB.forEach((f) => { if (f.p < YMIN || f.p > YMAX) return; const y = priceY(g, f.p); x.beginPath(); x.moveTo(g.L, y); x.lineTo(g.L + pw, y); x.stroke(); x.fillText(String(f.r).replace('0.', '.') + ' ' + rd(f.p), g.L + pw + 3, y); });
+  x.setLineDash([]);
+  // کانال انتخابی
+  const s = RES.snap[SEL].cs.BTC;
+  if (s.L && s.ch !== 'off') { x.fillStyle = 'rgba(95,211,154,.14)'; x.fillRect(dayX(g, SEL - 15), priceY(g, s.U), dayX(g, SEL + 15) - dayX(g, SEL - 15), priceY(g, s.L) - priceY(g, s.U)); }
+  const line = (a, col, w, dash, from) => { x.strokeStyle = col; x.lineWidth = w; x.setLineDash(dash || []); x.beginPath(); let st = false; for (let i = from; i < n; i++) { const v = a[i]; if (!isFinite(v) || v < YMIN * 0.5) continue; const X = dayX(g, i - I0), Y = priceY(g, Math.max(YMIN, Math.min(YMAX, v))); if (!st) { x.moveTo(X, Y); st = true; } else x.lineTo(X, Y); } x.stroke(); x.setLineDash([]); x.lineWidth = 1; };
+  line(smaArr(c, 21), '#8ea0bb', 1, [2, 2], lo); line(smaArr(c, 150), '#5aa9ff', 1.6, null, lo);
+  // ناحیهٔ آینده
+  x.fillStyle = 'rgba(232,196,106,.05)'; x.fillRect(dayX(g, 0), g.T, g.L + pw - dayX(g, 0), g.H - g.T - g.B);
+  line(c, '#e6edf7', 1.8, null, lo);
+  // خط امروز و روز انتخابی
+  x.strokeStyle = '#e8c46a'; x.beginPath(); x.moveTo(dayX(g, 0), g.T); x.lineTo(dayX(g, 0), g.H - g.B); x.stroke();
+  x.strokeStyle = '#ff9bd0'; x.setLineDash([3, 3]); x.beginPath(); x.moveTo(dayX(g, SEL), g.T); x.lineTo(dayX(g, SEL), g.H - g.B); x.stroke(); x.setLineDash([]);
+  // معامله‌های BTC
+  RES.tr.filter((t) => t.coin === 'BTC').forEach((t) => { const d = t.i - I0, px = dayX(g, d), py = priceY(g, Math.max(YMIN, Math.min(YMAX, c[t.i]))); x.fillStyle = t.side === 'buy' ? '#5fd39a' : '#ff5a4d'; x.beginPath(); if (t.side === 'buy') { x.moveTo(px, py - 2); x.lineTo(px - 4, py + 7); x.lineTo(px + 4, py + 7); } else { x.moveTo(px, py + 2); x.lineTo(px - 4, py - 7); x.lineTo(px + 4, py - 7); } x.fill(); });
+  x.fillStyle = '#8ea0bb'; x.textBaseline = 'alphabetic'; x.textAlign = 'left'; x.fillText('امروز →', dayX(g, 0) + 3, g.H - 4); x.textAlign = 'right'; x.fillText('+' + FUT + 'd', g.L + pw, g.H - 4); x.textAlign = 'left';
+  x.fillStyle = '#e6edf7'; x.textBaseline = 'middle'; x.fillText(rd(c[I0 + SEL]), g.L + pw + 3, priceY(g, Math.max(YMIN, Math.min(YMAX, c[I0 + SEL]))));
+}
+function drawEq() {
+  const { x, g } = setup(eq), S = RES.snap, N = S.length, hold = S.map((_, t) => CORE + CAP * 2 / 3 * PATH_AT(t) / P0), vals = S.map((s) => s.total);
+  const mn = Math.min.apply(null, vals.concat(hold)) * 0.98, mx = Math.max.apply(null, vals.concat(hold)) * 1.02, pw = g.W - g.L - g.R;
+  const X = (t) => g.L + pw * t / (N - 1), Y = (v) => g.T + (g.H - g.T - g.B) * (1 - (v - mn) / (mx - mn));
+  x.strokeStyle = '#8ea0bb'; x.setLineDash([4, 3]); x.beginPath(); hold.forEach((v, t) => t ? x.lineTo(X(t), Y(v)) : x.moveTo(X(t), Y(v))); x.stroke(); x.setLineDash([]);
+  x.strokeStyle = '#e6edf7'; x.lineWidth = 1.8; x.beginPath(); vals.forEach((v, t) => t ? x.lineTo(X(t), Y(v)) : x.moveTo(X(t), Y(v))); x.stroke(); x.lineWidth = 1;
+  x.strokeStyle = '#ff9bd0'; x.setLineDash([3, 3]); x.beginPath(); x.moveTo(X(SEL), g.T); x.lineTo(X(SEL), g.H - g.B); x.stroke(); x.setLineDash([]);
+  x.strokeStyle = '#22304a'; const y1 = Y(CAP); x.beginPath(); x.moveTo(g.L, y1); x.lineTo(g.L + pw, y1); x.stroke();
+  x.fillStyle = '#8ea0bb'; x.textBaseline = 'middle'; x.fillText('1000', g.L + pw + 3, y1); x.fillStyle = '#e6edf7'; x.fillText(String(Math.round(vals[SEL])), g.L + pw + 3, Y(vals[SEL]) + (Math.abs(Y(vals[SEL]) - y1) < 9 ? 10 : 0));
+}
+function PATH_AT(t) { return t === 0 ? P0 : PATH[t - 1]; }
+function render() {
+  const S = RES.snap[SEL], tot = S.total, eP = S.eng / tot, fP = 1 - eP, c = SER.BTC[I0 + SEL];
+  const endTot = RES.snap[FUT].total, holdEnd = CORE + CAP * 2 / 3 * PATH[FUT - 1] / P0;
+  let pk = 0, mdd = 0; RES.snap.forEach((s) => { pk = Math.max(pk, s.total); mdd = Math.max(mdd, 1 - s.total / pk); });
+  let hp = 0, hmdd = 0; for (let t = 0; t <= FUT; t++) { const v = CORE + CAP * 2 / 3 * PATH_AT(t) / P0; hp = Math.max(hp, v); hmdd = Math.max(hmdd, 1 - v / hp); }
+  document.getElementById('dlab').textContent = SEL === 0 ? 'امروز' : fa(SEL) + ' روز بعد از امروز';
+  let h = '<div class="mut">روز انتخابی — قیمت بیت‌کوین</div><div class="big">' + nf(c) + ' <span class="mut">(' + pc(c / P0 - 1, 1) + ' از امروز)</span></div>';
+  h += '<div class="big">' + usd(tot) + ' <span class="mut">ارزش کل (' + pc(tot / CAP - 1, 1) + ')</span></div><div class="bar"><div style="width:' + (eP * 100) + '%;background:var(--amb)"></div><div style="width:' + (fP * 100) + '%;background:#2b3b57"></div></div>';
+  h += '<div><b class="am">درگیر: ' + usd(S.eng) + ' (' + fa((eP * 100).toFixed(0)) + '٪)</b> &nbsp; <b>غیر درگیر: ' + usd(S.free) + ' (' + fa((fP * 100).toFixed(0)) + '٪)</b></div>';
+  let nIn = 0, nW = 0, nR = 0, rows = '';
+  for (const k of COINS) {
+    const s = S.cs[k], hasCh = s.ch !== 'none'; let cells = '';
+    for (let j = 1; j <= 4; j++) { if (j <= s.tp) { nIn++; cells += '<div class="gc in">ر' + fa(j) + '</div>'; } else { nW++; cells += '<div class="gc w">ر' + fa(j) + '</div>'; } }
+    if (hasCh) { if (s.ch === 'in') { nIn++; cells += '<div class="gc in">ک</div>'; } else { nW++; cells += '<div class="gc w ' + (s.ch === 'on' ? 'on' : '') + '">ک</div>'; } }
+    for (let j = 0; j < (hasCh ? 2 : 3); j++) { nR++; cells += '<div class="gc res">ذ</div>'; }
+    rows += '<div class="gr"><b>' + k + '</b>' + cells + '</div>';
+  }
+  h += '<div style="margin-top:8px"><b>۲۸ قسمت:</b> <span class="am">' + fa(nIn) + ' در معامله</span> · ' + fa(nW) + ' منتظر حد · ' + fa(nR) + ' ذخیره <span class="mut">(جمع ' + fa(nIn + nW + nR) + ')</span></div>' + rows;
+  const b = S.cs.BTC; h += '<div class="mut" style="margin-top:4px">حد ورود روند بیت‌کوین: بالای ' + nf(b.need) + (c >= b.need ? ' <span class="up">(باز)</span>' : '') + ' · حد خروج: زیر ' + nf(b.s150) + (b.L && b.ch !== 'off' ? ' · کانال: ' + nf(b.L) + ' تا ' + nf(b.U) : '') + '</div>';
+  h += '<hr style="border:0;border-top:1px solid var(--line);margin:10px 0"><div><b>پایان یک سال:</b> برنامه <b class="' + (endTot >= CAP ? 'up' : 'dn') + '">' + usd(endTot) + '</b> (بدترین افت در راه: ' + fa((mdd * 100).toFixed(0)) + '٪) · نگه‌داشتن ۲/۳ در ارزها <b>' + usd(holdEnd) + '</b> (بدترین افت: ' + fa((hmdd * 100).toFixed(0)) + '٪) · معامله‌ها: ' + fa(RES.tr.length) + '</div>';
+  document.getElementById('out').innerHTML = h;
+  const T = RES.tr.filter((t) => t.i - I0 <= SEL).slice(-8).reverse();
+  document.getElementById('tr').innerHTML = T.length ? T.map((t) => '<tr><td>' + t.coin + '</td><td>' + (t.side === 'buy' ? 'خرید' : 'فروش') + ' ' + (t.eng === 'trend' ? '(روند)' : '(کانال)') + '</td><td>' + t.why + '</td><td class="n">روز ' + fa(t.i - I0) + ' · ' + nf(t.price) + '</td></tr>').join('') : '<tr><td class="mut">هنوز معامله‌ای نشده.</td></tr>';
+  drawMain(); drawEq();
+}
+// ============ کشیدن با انگشت ============
+let drawing = false, lastD = null;
+function setAt(d, p) { d = Math.max(1, Math.min(FUT, Math.round(d))); p = Math.max(YMIN, Math.min(YMAX, p)); if (lastD != null && Math.abs(d - lastD.d) > 1) { const a = lastD.d, pa = lastD.p, st = d > a ? 1 : -1; for (let k = a + st; k !== d; k += st) PATH[k - 1] = pa + (p - pa) * (k - a) / (d - a); } PATH[d - 1] = p; lastD = { d, p }; }
+function evXY(e) { const r = cv.getBoundingClientRect(), g = geom(cv); return { x: (e.clientX - r.left) * g.W / r.width, y: (e.clientY - r.top) * g.H / r.height, g }; }
+cv.addEventListener('pointerdown', (e) => { const { x, y, g } = evXY(e); const d = xDay(g, x); if (d < 0) return; drawing = true; lastD = null; cv.setPointerCapture(e.pointerId); setAt(d, yPrice(g, y)); document.getElementById('day').value = SEL = Math.max(0, Math.min(FUT, Math.round(d))); recompute(); });
+cv.addEventListener('pointermove', (e) => { if (!drawing) return; const { x, y, g } = evXY(e); const d = xDay(g, x); setAt(d, yPrice(g, y)); document.getElementById('day').value = SEL = Math.max(0, Math.min(FUT, Math.round(d))); recompute(); });
+const endDraw = () => { drawing = false; lastD = null; }; cv.addEventListener('pointerup', endDraw); cv.addEventListener('pointercancel', endDraw);
+document.getElementById('day').addEventListener('input', (e) => { SEL = +e.target.value; render(); });
+document.querySelectorAll('#presets button').forEach((b) => b.onclick = () => { PATH = presets(b.dataset.p); recompute(); });
+function shift(f) { for (let t = Math.max(1, SEL); t <= FUT; t++) PATH[t - 1] = Math.max(YMIN, Math.min(YMAX, PATH[t - 1] * f)); recompute(); }
+document.getElementById('up10').onclick = () => shift(1.1); document.getElementById('dn10').onclick = () => shift(0.9); document.getElementById('up30').onclick = () => shift(1.3); document.getElementById('dn30').onclick = () => shift(0.7);
+function fibLv(S) {
+  const c = S.c, d = S.d, n = c.length; let ia = 0; for (let i = 0; i < n; i++) if (c[i] > c[ia]) ia = i;
+  const d0 = Date.UTC(2021, 10, 10) / 86400000; let il = -1; for (let i = 0; i < ia; i++) if (d[i] >= d0 && (il < 0 || c[i] < c[il])) il = i;
+  if (il < 0) return []; return [0.236, 0.382, 0.5, 0.618, 0.786].map((r) => ({ r, p: c[ia] - r * (c[ia] - c[il]) }));
+}
+(async function () {
+  try {
+    const [oh, price] = await Promise.all([getJSON('./ohlcv.json' + q), getJSON('./price.json' + q)]), td = Math.floor(oh.fetched / 86400), S = {};
+    for (const k of COINS) { const s = buildSeries(k, oh, price, td); if (s && s.c.length > HIST) S[k] = s; }
+    if (!S.BTC) throw new Error('داده‌ی بیت‌کوین نیست');
+    GROW = { S }; P0 = S.BTC.c[S.BTC.c.length - 1]; YMIN = P0 * 0.3; YMAX = P0 * 2.3; FIB = fibLv(S.BTC);
+    for (const k of COINS) if (!S[k]) { document.getElementById('hint').textContent = 'داده ' + k + ' کامل نیست.'; }
+    document.getElementById('day').max = FUT; PATH = presets('flat'); window.__sim = { runEngine, presets, get state() { return { PATH, RES, SER, I0 }; }, setPath: (p) => { PATH = p; recompute(); } };
+    document.getElementById('hint').textContent = 'قیمت امروز: ' + nf(P0) + ' · خط صورتی = روز انتخابی · مثلث سبز/قرمز = خرید/فروش بیت‌کوین';
+    recompute(); window.addEventListener('resize', render);
+  } catch (e) { document.getElementById('hint').innerHTML = '<span class="warn">خطا: ' + e.message + '</span>'; }
+})();
+</script>
+</body>
+</html>
