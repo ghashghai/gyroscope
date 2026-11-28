@@ -25,6 +25,7 @@ tr.cur td{color:var(--gold);font-weight:700}
 .coin b{display:block;font-size:13px}
 a{color:var(--gold)}
 .warn{color:var(--amb);font-size:12px}
+.wl{border:1px solid var(--line);border-radius:10px;margin:6px 0;background:#0b1220}.wl summary{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;cursor:pointer;list-style:none}.wl summary span.n{direction:ltr}.wl .dt{padding:4px 10px 10px;font-size:13px}
 .tabs{display:flex;gap:6px;margin:6px 0}.tabs button{flex:1;background:#0b1220;color:var(--mut);border:1px solid var(--line);border-radius:10px;padding:6px 0;font-family:inherit;font-size:13px}.tabs button.on{color:var(--gold);border-color:var(--gold)}
 canvas{width:100%;display:block;background:#0b1220;border-radius:10px}.gr{display:flex;align-items:center;gap:4px;margin:4px 0;direction:ltr}.gr b{width:34px;font-size:12px}.gc{width:34px;height:30px;border-radius:7px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--mut);background:#0b1220}.gc.in{background:var(--amb);color:#111;border-color:var(--amb);font-weight:700}.gc.w{border-style:dashed}.gc.res{background:#16223a}.gc.on{border-color:var(--grn);color:var(--grn)}.lg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--mut);margin:6px 0}.lg i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-inline-end:4px}
 </style>
@@ -38,6 +39,7 @@ canvas{width:100%;display:block;background:#0b1220;border-radius:10px}.gr{displa
 <div class="card" id="c1"><h2>۱ · الان کجاییم؟</h2><div class="mut">…</div></div>
 <div class="card" id="c2"><h2>۲ · مرز بعدی کجاست؟ (فیبوناچی)</h2><div class="mut">…</div></div>
 <div class="card" id="c4"><h2>۴ · قسمت آزمایش (کانال)</h2><div class="mut">…</div></div>
+<div class="card" id="c6"><h2>۶ · از روز شکست تا امروز (هوشمندی برنامه)</h2><div class="mut">…</div></div>
 <div class="card" id="c5"><h2>۵ · نمودار و حدها</h2><div class="mut">…</div></div>
 <div class="card"><h2>۳ · آژیر</h2><div class="mut">در آرامش پنهان است. بالای همین صفحه فقط وقتی خطر باشد روشن می‌شود. هیچ اعلانی به گوشی نمی‌فرستد.</div></div>
 <div class="mut" style="margin:18px 0">برنامه فقط هشدار می‌دهد؛ اهرم و شورت ندارد. همهٔ عددها از داده‌ی واقعی خوانده می‌شوند. <a href="full.html">صفحهٔ کامل قبلی (رادار، دفتر، همه‌ی کارت‌ها)</a></div>
@@ -146,10 +148,14 @@ function card4(B) {
   h += '<div style="display:flex;height:16px;border-radius:8px;overflow:hidden;margin:8px 0;background:#0b1220"><div style="width:' + (eP * 100) + '%;background:var(--amb)"></div><div style="width:' + (fP * 100) + '%;background:#2b3b57"></div></div>';
   h += '<div><b class="am">درگیر: ' + usd0(B.engaged) + ' (' + pp(eP) + ')</b> &nbsp; <b>غیر درگیر: ' + usd0(B.free) + ' (' + pp(fP) + ')</b></div>';
   h += '<div class="mut">درگیر یعنی الان به شکل ارز در معامله است. غیر درگیر یعنی نقد (USDT): هسته ' + usd0(B.core) + ' + قسمت‌های خالی.</div>';
-  h += '<table style="margin-top:8px"><tr class="mut"><td>ارز</td><td class="n">درگیر</td><td class="n">آزاد</td><td>روند</td><td>کانال</td></tr>';
-  const cs = { in: 'در معامله', on: 'روشن، نقد', off: 'خاموش', none: 'ندارد (نقد)' };
-  for (const r of B.coins) h += '<tr><td><b>' + r.coin + '</b></td><td class="n">' + usd0(r.engaged) + '</td><td class="n">' + usd0(r.free) + '</td><td>' + fa(r.trend_parts) + ' از ۴</td><td>' + cs[r.chan_state] + '</td></tr>';
-  h += '</table><div class="mut" style="margin-top:6px">هر ارز ۷ قسمت دارد: ۴ قسمت روند (هفته‌ای یکی، فقط بالای خط ۱۵۰ و ۲۱)، ۱ قسمت آزمایش کانال (فقط BTC و SUI؛ در ETH و BNB این قسمت نقد می‌ماند)، ۲ قسمت ذخیره (نقد). جمع «درگیر + غیر درگیر» همیشه برابر ارزش کل است و برنامه در هر اجرا این را وارسی می‌کند.</div>';
+  const faN = (x, d) => fa(x.toFixed(d)).replace('.', '٫'), AM = { BTC: 5, ETH: 4, BNB: 3, SUI: 2 }, NM = { BTC: 'بیت‌کوین', ETH: 'اتریوم', BNB: 'بایننس‌کوین', SUI: 'سویی' }, cs = { in: 'در معامله', on: 'روشن، نقد', off: 'خاموش', none: 'ندارد (نقد)' };
+  h += '<h3 style="font-size:15px;margin:10px 0 4px;color:var(--gold)">کیف پول</h3><div class="mut">روی هر ردیف بزن تا جزئیات باز شود.</div>';
+  const keep = Array.from(document.querySelectorAll('#c4 details[open]')).map((d) => d.dataset.k);
+  h += '<details class="wl" data-k="usdt"' + (keep.indexOf('usdt') >= 0 ? ' open' : '') + '><summary><span>دلار (USDT)</span><span class="n">' + faN(B.free, 2) + '</span><span class="n mut">' + pp(fP) + '</span></summary><div class="dt">هسته (دست‌نخورده): ' + usd0(B.core) + '<br>نقد قسمت‌ها (ذخیره و قسمت‌های خالی): ' + usd0(B.free - B.core) + '<br><span class="mut">درگیر نیست؛ آماده برای خرید.</span></div></details>';
+  for (const r of B.coins) {
+    const un = r.engaged - (r.cost || 0), last = (B.trades || []).filter((t) => t.coin === r.coin).slice(-4).reverse().map((t) => (t.side === 'buy' ? 'خرید' : 'فروش') + ' ' + fa(t.date) + ' در ' + nf(t.price) + (t.pnl != null ? ' (' + (t.pnl >= 0 ? '+' : '−') + faN(Math.abs(t.pnl), 1) + ' دلار)' : '')).join('<br>');
+    h += '<details class="wl" data-k="' + r.coin + '"' + (keep.indexOf(r.coin) >= 0 ? ' open' : '') + '><summary><span>' + NM[r.coin] + ' (' + r.coin + ')</span><span class="n">' + faN(r.units || 0, AM[r.coin]) + '</span><span class="n ' + (r.engaged > 0 ? 'am' : 'mut') + '">' + usd0(r.engaged) + '</span></summary><div class="dt">قیمت (آخرین بسته): ' + nf(r.close) + (r.units > 0 ? ' · میانگین خرید: ' + nf(r.cost / r.units) : '') + '<br>سود/زیان باز: <b class="' + (un >= 0 ? 'up' : 'dn') + '">' + usd0(un) + '</b> · سود/زیان بسته‌شده: <b class="' + ((r.realized || 0) >= 0 ? 'up' : 'dn') + '">' + usd0(r.realized || 0) + '</b><br>قسمت روند: ' + fa(r.trend_parts) + ' از ۴ · کانال: ' + cs[r.chan_state] + '<br>' + (last || '<span class="mut">هنوز معامله‌ای نشده.</span>') + '</div></details>';
+  }
   h += '<div id="grid"></div>';
   const T = B.trades || [], l = T[T.length - 1];
   h += '<div class="mut">معامله‌ها تا حالا: ' + fa(B.n_trades) + (l ? ' · آخرین: ' + l.coin + ' ' + (l.side === 'buy' ? 'خرید' : 'فروش') + ' ' + fa(l.date) : '') + '</div>';
@@ -205,6 +211,19 @@ function renderGrid() {
   el.innerHTML = '<div style="margin-top:10px"><b>۲۸ قسمت (۴ ارز × ۷):</b> <span class="am">' + fa(n.in) + ' در معامله</span> · ' + fa(n.w) + ' منتظر حد خودشان · ' + fa(n.res) + ' ذخیرهٔ نقد <span class="mut">(جمع ' + fa(tot) + ')</span></div>' + rows +
     '<div class="lg"><span><span class="gc in" style="display:inline-flex;width:18px;height:14px"></span> در معامله</span><span><span class="gc w" style="display:inline-flex;width:18px;height:14px"></span> منتظر حد (ر = روند، ک = کانال)</span><span><span class="gc res" style="display:inline-flex;width:18px;height:14px"></span> ذخیره (ذ)</span></div><div class="mut" style="font-size:12px">هر قسمت حدود ' + fa(Math.round(part)) + ' دلار است. «منتظر حد» یعنی قسمت آماده است ولی قیمت هنوز به حد ورودش نرسیده.</div>';
 }
+function card6() {
+  const el = document.getElementById('c6'); if (!C5) return; let h = '<h2>۶ · از روز شکست تا امروز (هوشمندی برنامه)</h2>', rows = '', any = false;
+  for (const k of ['BTC', 'ETH', 'BNB', 'SUI']) {
+    const S = C5.S[k]; if (!S) continue; const c = S.c, d = S.d, n = c.length, s = smaArr(c, 150); let b = -1;
+    for (let i = n - 1; i > 150; i--) { if (c[i] < s[i] && c[i - 1] >= s[i - 1]) { b = i; break; } if (c[i] >= s[i] && i < n - 1) break; }
+    if (b < 0) { rows += '<tr><td>' + k + '</td><td colspan="3" class="mut">بالای خط ۱۵۰ است؛ شکستی در جریان نیست.</td></tr>'; continue; }
+    any = true; const stay = c[n - 1] / c[b] - 1, ex = b + 1 <= n - 1 ? c[b + 1] / c[b] - 1 : stay;
+    rows += '<tr><td><b>' + k + '</b><div class="mut" style="font-size:11px">' + fa(dstr(d[b] * 86400)) + '</div></td><td class="n dn">' + pc(stay, 0) + '</td><td class="n">' + pc(ex, 0) + '</td><td class="n up">' + pc(ex - stay, 0).replace('+', '+') + '</td></tr>';
+  }
+  h += '<table><tr class="mut"><td>ارز · روز شکست</td><td class="n">اگر مانده بودی</td><td class="n">برنامه (خروج)</td><td class="n">ضرر جلوگیری‌شده</td></tr>' + rows + '</table>';
+  h += '<div class="mut" style="margin-top:6px">یعنی: اگر در روز بسته‌شدن زیر خط ۱۵۰ ارز در دستت بود، تا امروز چقدر می‌ریخت و برنامه (فروش با بستهٔ روز بعد) چقدر. این حساب روی قیمت‌های واقعی است ولی «اگر»ی است: حساب زندهٔ برنامه از ۲۶ نوامبر شروع شده و آن موقع ارزی در دستش نبود.</div>';
+  el.innerHTML = h;
+}
 function render5() {
   const el = document.getElementById('c5'), S = C5.S[curCoin]; if (!S) return;
   const row = (C5.B && C5.B.coins || []).find((r) => r.coin === curCoin), c = S.c, n = c.length, p = c[n - 1], s150 = smaArr(c, 150)[n - 1], s21 = smaArr(c, 21)[n - 1];
@@ -235,7 +254,7 @@ function render5() {
     const age = h1 && h1.fetched ? (Date.now() / 1000 - h1.fetched) / 3600 : NaN;
     document.getElementById('stamp').innerHTML = 'قیمت: ' + pt + (isFinite(age) ? ' · داده ' + fa(Math.floor(age)) + ' ساعت پیش گرفته شد' + (age > 6 ? ' <span class="warn">(قدیمی)</span>' : '') : '');
     card1(rg, p); card2(S, p); card4(chj);
-    { const td = Math.floor(oh.fetched / 86400), all = {}; for (const k of ['BTC', 'ETH', 'BNB', 'SUI']) { try { const s = buildSeries(k, oh, price, td); if (s && s.c.length > 200) all[k] = s; } catch (e) { } } C5 = { S: all, B: chj }; render5(); renderGrid(); window.addEventListener('resize', render5); }
+    { const td = Math.floor(oh.fetched / 86400), all = {}; for (const k of ['BTC', 'ETH', 'BNB', 'SUI']) { try { const s = buildSeries(k, oh, price, td); if (s && s.c.length > 200) all[k] = s; } catch (e) { } } C5 = { S: all, B: chj }; render5(); renderGrid(); card6(); window.addEventListener('resize', render5); }
     const upd = () => window.Siren && Siren.update(sirenAll(S, h1));
     upd();
     setInterval(async () => { try { const h = await getJSON('./ohlcv1h.json?t=' + Date.now()); if (window.Siren) Siren.update(sirenAll(S, h)); } catch (e) { } }, 900000);

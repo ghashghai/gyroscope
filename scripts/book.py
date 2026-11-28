@@ -32,14 +32,15 @@ def fill(pool, c, trades, coin, eng, day):
     if p['side'] == 'buy':
         spend = min(p.get('amount', pool['cash']), pool['cash'] / (1 + FEE))
         if spend > 1e-9:
-            pool['units'] += spend / c; pool['cash'] -= spend * (1 + FEE)
+            pool['units'] += spend / c; pool['cash'] -= spend * (1 + FEE); pool['cost'] = pool.get('cost', 0.0) + spend * (1 + FEE)
             if eng == 'trend': pool['parts'] += 1
             trades.append({'coin': coin, 'engine': eng, 'day': day, 'date': iso(day), 'side': 'buy', 'price': float('%.6g' % c), 'amount': round(spend, 2), 'why': p['why']})
     else:
         if pool['units'] > 0:
             got = pool['units'] * c * (1 - FEE)
-            trades.append({'coin': coin, 'engine': eng, 'day': day, 'date': iso(day), 'side': 'sell', 'price': float('%.6g' % c), 'amount': round(got, 2), 'why': p['why']})
-            pool['cash'] += got; pool['units'] = 0.0
+            pnl = got - pool.get('cost', 0.0)
+            trades.append({'coin': coin, 'engine': eng, 'day': day, 'date': iso(day), 'side': 'sell', 'price': float('%.6g' % c), 'amount': round(got, 2), 'why': p['why'], 'pnl': round(pnl, 2)})
+            pool['cash'] += got; pool['units'] = 0.0; pool['cost'] = 0.0
             if eng == 'trend': pool['parts'] = 0
     pool['pending'] = None
 
@@ -100,7 +101,8 @@ def main():
                      'trend_parts': T['parts'], 'trend_value': round(te, 2), 'trend_pending': (T['pending'] or {}).get('side'),
                      'chan_state': 'none' if sym not in CHANNEL_COINS else ('in' if H['units'] > 0 else ('on' if H['active'] else 'off')), 'chan_value': round(he + H['cash'], 2),
                      'chan_L': float('%.6g' % H['L']) if H['L'] else None, 'chan_U': float('%.6g' % H['U']) if H['U'] else None, 'chan_pending': (H['pending'] or {}).get('side'),
-                     'reserve': round(st['reserve'], 2), 'last_day': iso(D[-1]), 'sma150': float('%.6g' % S150[-1])})
+                     'reserve': round(st['reserve'], 2), 'units': float('%.8g' % (T['units'] + H['units'])), 'cost': round(T.get('cost', 0.0) + H.get('cost', 0.0), 2),
+                     'realized': round(sum(t.get('pnl', 0.0) for t in trades if t['coin'] == sym), 2), 'last_day': iso(D[-1]), 'sma150': float('%.6g' % S150[-1])})
         tot_e += eng; tot_f += free
     total = tot_e + tot_f + CORE
     assert abs(total - sum(r['total'] for r in rows) - CORE) < 0.03, 'accounting does not add up'
