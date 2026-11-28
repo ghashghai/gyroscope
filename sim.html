@@ -77,7 +77,7 @@ function buildSeries(sym, oh, price, todayDay) {
 }
 // ============ موتور برنامه (همان قاعده‌های book.py) ============
 const FEE = 0.002, WD = 0.07, CAP = 1000, CORE = CAP / 3, BUCKET = CAP * 2 / 3 / 4, PART = BUCKET / 7, CHC = ['BTC', 'SUI'], COINS = ['BTC', 'ETH', 'BNB', 'SUI'];
-function newCoin() { return { T: { cash: 4 * PART, units: 0, parts: 0, lastBuy: -99, pend: null, cost: 0 }, H: { cash: PART, units: 0, L: null, U: null, active: false, pend: null, cost: 0 }, res: 2 * PART }; }
+function newCoin() { return { T: { cash: 6 * PART, units: 0, parts: 0, lastBuy: -99, pend: null, cost: 0 }, H: { cash: PART, units: 0, L: null, U: null, active: false, pend: null, cost: 0 }, res: 0 }; }
 function fill(pool, c, tr, coin, eng, i) {
   const p = pool.pend; if (!p) return;
   if (p.side === 'buy') { const sp = Math.min(p.amount != null ? p.amount : pool.cash, pool.cash / (1 + FEE)); if (sp > 1e-9) { pool.units += sp / c; pool.cash -= sp * (1 + FEE); pool.cost += sp * (1 + FEE); if (eng === 'trend') pool.parts++; tr.push({ coin, eng, i, side: 'buy', price: c, amt: sp, why: p.why }); } }
@@ -88,7 +88,7 @@ function step(st, coin, i, C, S21, S150, tr) {
   const c = C[i], a150 = c >= S150[i], a21 = c >= S21[i], T = st.T, H = st.H;
   fill(T, c, tr, coin, 'trend', i); fill(H, c, tr, coin, 'channel', i);
   if (!a150) { if (T.units > 0) T.pend = { side: 'sell', why: 'زیر خط ۱۵۰' }; }
-  else if (a21 && T.parts < 4 && (T.parts === 0 || i - T.lastBuy >= 7)) { T.pend = { side: 'buy', amount: PART, why: 'قسمت روند ' + (T.parts + 1) }; T.lastBuy = i; }
+  else if (a21 && T.parts < (c / S150[i] - 1 >= 0.10 ? 6 : 4) && (T.parts === 0 || i - T.lastBuy >= 2)) { T.pend = { side: 'buy', amount: PART, why: 'قسمت روند ' + (T.parts + 1) }; T.lastBuy = i; }
   if (CHC.indexOf(coin) < 0) return;
   if (!a150) { H.active = false; H.L = null; if (H.units > 0) H.pend = { side: 'sell', why: 'روند خاموش' }; }
   else {
@@ -178,7 +178,7 @@ function drawEq() {
   x.fillStyle = '#8ea0bb'; x.textBaseline = 'middle'; x.fillText('1000', g.L + pw + 3, y1); x.fillStyle = '#e6edf7'; x.fillText(String(Math.round(vals[SEL])), g.L + pw + 3, Y(vals[SEL]) + (Math.abs(Y(vals[SEL]) - y1) < 9 ? 10 : 0));
 }
 function PATH_AT(t) { return t === 0 ? P0 : PATH[t - 1]; }
-const RGN = { up: ['صعود', 'up', 'قیمت بالای میانگین ۱۵۰ و ۲۱ روزه است؛ برنامه تا ۴ قسمت وارد می‌شود.'], pullback: ['صعود با اصلاح', 'am', 'بالای ۱۵۰ ولی زیر ۲۱ روزه؛ قسمت‌های موجود می‌مانند، قسمت تازه نه.'], attempt: ['تلاش برای برگشت', 'am', 'هنوز زیر ۱۵۰ روزه؛ برنامه صبر می‌کند.'], down: ['ریزشی', 'dn', 'زیر ۱۵۰ و ۲۱ روزه؛ برنامه در نقد می‌ماند و چیزی نمی‌خرد.'] };
+const RGN = { up: ['صعود', 'up', 'قیمت بالای میانگین ۱۵۰ و ۲۱ روزه است؛ برنامه هر ۲ روز یک قسمت می‌خرد (تا ۴؛ تا ۶ وقتی ۱۰٪ بالای ۱۵۰).'], pullback: ['صعود با اصلاح', 'am', 'بالای ۱۵۰ ولی زیر ۲۱ روزه؛ قسمت‌های موجود می‌مانند، قسمت تازه نه.'], attempt: ['تلاش برای برگشت', 'am', 'هنوز زیر ۱۵۰ روزه؛ برنامه صبر می‌کند.'], down: ['ریزشی', 'dn', 'زیر ۱۵۰ و ۲۱ روزه؛ برنامه در نقد می‌ماند و چیزی نمی‌خرد.'] };
 function regAt(i) { const c = SER.BTC[i], a150 = c >= RES.S150[i], a21 = c >= RES.S21[i]; return a150 && a21 ? 'up' : a150 ? 'pullback' : a21 ? 'attempt' : 'down'; }
 function regJump(dir) { const n = SER.BTC.length; let i = I0 + SEL, r = regAt(i); for (i += dir; i >= I0 && i < n; i += dir) if (regAt(i) !== r) { SEL = i - I0; document.getElementById('day').value = SEL; render(); return; } }
 const AMT = { BTC: 5, ETH: 4, BNB: 3, SUI: 2 }, NAME = { BTC: 'بیت‌کوین', ETH: 'اتریوم', BNB: 'بایننس‌کوین', SUI: 'سویی' };
@@ -208,14 +208,14 @@ function render() {
   h += '<details class="wl" data-k="usdt"' + (OPEN.has('usdt') ? ' open' : '') + '><summary><span>دلار (USDT)</span><span class="n">' + faN(usdt, 2) + '</span><span class="n mut">' + fa((usdt / tot * 100).toFixed(0)) + '٪</span></summary><div class="dt">هسته (دست‌نخورده): ' + usd(CORE) + '<br>پول نقد قسمت‌ها (ذخیره و خالی): ' + usd(usdt - CORE) + '<br><span class="mut">درگیر نیست؛ آماده برای خرید.</span></div></details>';
   for (const k of COINS) {
     const s = S.cs[k], val = s.u * s.price, un = val - s.cost, real = RES.tr.filter((t) => t.coin === k && t.side === 'sell' && t.i - I0 <= SEL).reduce((a, t) => a + t.pnl, 0), hasCh = s.ch !== 'none';
-    let cells = ''; for (let j = 1; j <= 4; j++) cells += '<div class="gc ' + (j <= s.tp ? 'in' : 'w') + '">ر' + fa(j) + '</div>';
+    let cells = ''; for (let j = 1; j <= 6; j++) cells += '<div class="gc ' + (j <= s.tp ? 'in' : 'w') + '">ر' + fa(j) + '</div>';
     if (hasCh) cells += '<div class="gc ' + (s.ch === 'in' ? 'in' : 'w ' + (s.ch === 'on' ? 'on' : '')) + '">ک</div>';
-    for (let j = 0; j < (hasCh ? 2 : 3); j++) cells += '<div class="gc res">ذ</div>';
+    for (let j = 0; j < (hasCh ? 0 : 1); j++) cells += '<div class="gc res">ذ</div>';
     const trs = RES.tr.filter((t) => t.coin === k && t.i - I0 <= SEL).slice(-5).reverse().map((t) => (t.side === 'buy' ? 'خرید' : 'فروش') + ' روز ' + fa(t.i - I0) + ' در ' + nf(t.price) + (t.pnl != null ? ' (' + (t.pnl >= 0 ? '+' : '−') + faN(Math.abs(t.pnl), 1) + ' دلار)' : '')).join('<br>');
     h += '<details class="wl" data-k="' + k + '"' + (OPEN.has(k) ? ' open' : '') + '><summary><span>' + NAME[k] + ' (' + k + ')</span><span class="n">' + faN(s.u, AMT[k]) + '</span><span class="n ' + (val > 0 ? 'am' : 'mut') + '">' + usd(val) + '</span></summary><div class="dt">قیمت: ' + nf(s.price) + (s.u > 0 ? ' · میانگین خرید: ' + nf(s.cost / s.u) : '') + '<br>سود/زیان باز: <b class="' + (un >= 0 ? 'up' : 'dn') + '">' + usd(un) + '</b> · سود/زیان بسته‌شده: <b class="' + (real >= 0 ? 'up' : 'dn') + '">' + usd(real) + '</b><div class="gr" style="margin-top:6px"><b></b>' + cells + '</div>' + (trs ? '<div class="mut" style="margin-top:4px">' + trs + '</div>' : '<div class="mut">هنوز معامله‌ای نشده.</div>') + '</div></details>';
   }
   h += '<div class="bar"><div style="width:' + (eP * 100) + '%;background:var(--amb)"></div><div style="width:' + (fP * 100) + '%;background:#2b3b57"></div></div><div><b class="am">درگیر (به شکل ارز): ' + usd(S.eng) + ' (' + fa((eP * 100).toFixed(0)) + '٪)</b> · <b>نقد: ' + usd(S.free) + ' (' + fa((fP * 100).toFixed(0)) + '٪)</b></div>';
-  h += '<div class="mut" style="font-size:12px">ر = قسمت روند (تا ۴)، ک = قسمت کانال، ذ = ذخیرهٔ نقد. خانهٔ نارنجی یعنی آن قسمت الان ارز در دست دارد.</div>';
+  h += '<div class="mut" style="font-size:12px">ر = قسمت روند (ر۱ تا ر۴ پایه، ر۵ و ر۶ «قوی»: فقط وقتی قیمت ≥۱۰٪ بالای خط ۱۵۰ است)، ک = قسمت کانال، ذ = ذخیرهٔ نقد. خانهٔ نارنجی یعنی آن قسمت الان ارز در دست دارد.</div>';
   document.getElementById('out').innerHTML = h;
   const T = RES.tr.filter((t) => t.i - I0 <= SEL).slice(-8).reverse();
   document.getElementById('tr').innerHTML = T.length ? T.map((t) => '<tr><td>' + t.coin + '</td><td>' + (t.side === 'buy' ? 'خرید' : 'فروش') + ' ' + (t.eng === 'trend' ? '(روند)' : '(کانال)') + '</td><td>' + t.why + '</td><td class="n">روز ' + fa(t.i - I0) + ' · ' + nf(t.price) + '</td></tr>').join('') : '<tr><td class="mut">هنوز معامله‌ای نشده.</td></tr>';

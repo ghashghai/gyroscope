@@ -4,17 +4,19 @@
 Hypothetical capital 1000 at the start day (the user's choice). Split fixed in advance:
   core = 1/3 (USDT, never touched) ; the other 2/3 is split equally between BTC, ETH, BNB, SUI ; each coin bucket = 7 equal parts.
 Per coin the 7 parts are assigned like this:
-  4 parts  TREND   : buy one part per 7 days while the close is above both its 150-day and 21-day average (max 4); sell all when the close is below the 150-day average.
+  4+2 parts TREND  : buy one part every 2 days while the close is above both its 150-day and 21-day average (max 4 parts; max 6 when the close is >= 10% above the 150-day
+                     average = 'strong' parts); sell all when the close is below the 150-day average. (Aggressive version, chosen 2026-11-28 after history tests.)
   1 part   CHANNEL : experiment (paper), BTC and SUI only (for ETH and BNB this part is idle cash). Active only while close >= 150-day average. Channel [L, L*1.07]: buy near L, sell at U, stop 7% below L; if the price escapes the
                      channel the part moves to the next channel. 
-  2 parts  RESERVE : idle cash (the program has no tested rule for them).
+  RESERVE          : none for BTC/SUI; for ETH/BNB the channel part stays idle cash (1 part).
 Signals use the close of day i, fills use the close of day i+1 (a real closed price). Fee 0.2% per fill. Part size is fixed at bucket/7 (profits and losses stay in their pool).
 ENGAGED = value of coins held at the last closed price. FREE = all cash (core + idle parts + unused slots). ENGAGED + FREE = TOTAL (checked).
 """
 import json, os, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from regime import series, sma, load, iso, DAY, ROOT
-FEE, W, RV = 0.002, 0.07, 1
+FEE, W, RV = 0.002, 0.07, 2
+GAP, STRONG = 2, 0.10   # aggressive trend: one part every 2 days; 2 extra 'strong' parts when the close is >= 10% above the 150-day average
 COINS = ['BTC', 'ETH', 'BNB', 'SUI']
 CHANNEL_COINS = ('BTC', 'SUI')   # ETH and BNB channel removed 2026-11-27 (tested median 0.83/0.84 per year): their channel part stays idle cash
 CAPITAL = 1000.0
@@ -23,8 +25,8 @@ BUCKET = CAPITAL * 2 / 3 / 4
 PART = BUCKET / 7
 
 def new_coin():
-    return {'trend': {'cash': 4 * PART, 'units': 0.0, 'parts': 0, 'last_buy_day': -99, 'pending': None},
-            'chan': {'cash': PART, 'units': 0.0, 'L': None, 'U': None, 'active': False, 'pending': None}, 'reserve': 2 * PART, 'last_day': None}
+    return {'trend': {'cash': 6 * PART, 'units': 0.0, 'parts': 0, 'last_buy_day': -99, 'pending': None},
+            'chan': {'cash': PART, 'units': 0.0, 'L': None, 'U': None, 'active': False, 'pending': None}, 'reserve': 0.0, 'last_day': None}
 
 def fill(pool, c, trades, coin, eng, day):
     p = pool['pending']
@@ -51,7 +53,7 @@ def step(st, coin, i, D, C, S21, S150, trades):
     # trend engine
     if not a150:
         if T['units'] > 0: T['pending'] = {'side': 'sell', 'why': 'below 150-day average'}
-    elif a21 and T['parts'] < 4 and (T['parts'] == 0 or day - T['last_buy_day'] >= 7):
+    elif a21 and T['parts'] < (6 if c / S150[i] - 1 >= STRONG else 4) and (T['parts'] == 0 or day - T['last_buy_day'] >= GAP):
         T['pending'] = {'side': 'buy', 'amount': PART, 'why': 'uptrend part %d' % (T['parts'] + 1)}; T['last_buy_day'] = day
     # channel engine
     if coin not in CHANNEL_COINS:

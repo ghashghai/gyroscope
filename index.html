@@ -154,7 +154,7 @@ function card4(B) {
   h += '<details class="wl" data-k="usdt"' + (keep.indexOf('usdt') >= 0 ? ' open' : '') + '><summary><span>دلار (USDT)</span><span class="n">' + faN(B.free, 2) + '</span><span class="n mut">' + pp(fP) + '</span></summary><div class="dt">هسته (دست‌نخورده): ' + usd0(B.core) + '<br>نقد قسمت‌ها (ذخیره و قسمت‌های خالی): ' + usd0(B.free - B.core) + '<br><span class="mut">درگیر نیست؛ آماده برای خرید.</span></div></details>';
   for (const r of B.coins) {
     const un = r.engaged - (r.cost || 0), last = (B.trades || []).filter((t) => t.coin === r.coin).slice(-4).reverse().map((t) => (t.side === 'buy' ? 'خرید' : 'فروش') + ' ' + fa(t.date) + ' در ' + nf(t.price) + (t.pnl != null ? ' (' + (t.pnl >= 0 ? '+' : '−') + faN(Math.abs(t.pnl), 1) + ' دلار)' : '')).join('<br>');
-    h += '<details class="wl" data-k="' + r.coin + '"' + (keep.indexOf(r.coin) >= 0 ? ' open' : '') + '><summary><span>' + NM[r.coin] + ' (' + r.coin + ')</span><span class="n">' + faN(r.units || 0, AM[r.coin]) + '</span><span class="n ' + (r.engaged > 0 ? 'am' : 'mut') + '">' + usd0(r.engaged) + '</span></summary><div class="dt">قیمت (آخرین بسته): ' + nf(r.close) + (r.units > 0 ? ' · میانگین خرید: ' + nf(r.cost / r.units) : '') + '<br>سود/زیان باز: <b class="' + (un >= 0 ? 'up' : 'dn') + '">' + usd0(un) + '</b> · سود/زیان بسته‌شده: <b class="' + ((r.realized || 0) >= 0 ? 'up' : 'dn') + '">' + usd0(r.realized || 0) + '</b><br>قسمت روند: ' + fa(r.trend_parts) + ' از ۴ · کانال: ' + cs[r.chan_state] + '<br>' + (last || '<span class="mut">هنوز معامله‌ای نشده.</span>') + '</div></details>';
+    h += '<details class="wl" data-k="' + r.coin + '"' + (keep.indexOf(r.coin) >= 0 ? ' open' : '') + '><summary><span>' + NM[r.coin] + ' (' + r.coin + ')</span><span class="n">' + faN(r.units || 0, AM[r.coin]) + '</span><span class="n ' + (r.engaged > 0 ? 'am' : 'mut') + '">' + usd0(r.engaged) + '</span></summary><div class="dt">قیمت (آخرین بسته): ' + nf(r.close) + (r.units > 0 ? ' · میانگین خرید: ' + nf(r.cost / r.units) : '') + '<br>سود/زیان باز: <b class="' + (un >= 0 ? 'up' : 'dn') + '">' + usd0(un) + '</b> · سود/زیان بسته‌شده: <b class="' + ((r.realized || 0) >= 0 ? 'up' : 'dn') + '">' + usd0(r.realized || 0) + '</b><br>قسمت روند: ' + fa(r.trend_parts) + ' از ۶ · کانال: ' + cs[r.chan_state] + '<br>' + (last || '<span class="mut">هنوز معامله‌ای نشده.</span>') + '</div></details>';
   }
   h += '<div id="grid"></div>';
   const T = B.trades || [], l = T[T.length - 1];
@@ -201,9 +201,9 @@ function renderGrid() {
   for (const r of B.coins) {
     const S = C5.S[r.coin]; if (!S) continue; const c = S.c, k = c.length, p = c[k - 1], s150 = smaArr(c, 150)[k - 1], s21 = smaArr(c, 21)[k - 1], need = Math.max(s150, s21);
     const hasCh = r.chan_state !== 'none'; let cells = '';
-    for (let j = 1; j <= 4; j++) { if (j <= r.trend_parts) { n.in++; cells += '<div class="gc in" title="قسمت روند ' + j + ' در معامله">ر' + fa(j) + '</div>'; } else { n.w++; cells += '<div class="gc w" title="قسمت روند ' + j + ' منتظر حد ورود ' + Math.round(need) + '">ر' + fa(j) + '</div>'; } }
+    for (let j = 1; j <= 6; j++) { if (j <= r.trend_parts) { n.in++; cells += '<div class="gc in" title="قسمت روند ' + j + ' در معامله">ر' + fa(j) + '</div>'; } else { n.w++; cells += '<div class="gc w" title="قسمت روند ' + j + (j > 4 ? ' (قوی: فقط ۱۰٪ بالای خط ۱۵۰)' : '') + ' منتظر حد ورود ' + Math.round(need) + '">ر' + fa(j) + '</div>'; } }
     if (hasCh) { if (r.chan_state === 'in') { n.in++; cells += '<div class="gc in" title="کانال در معامله">ک</div>'; } else { n.w++; cells += '<div class="gc w ' + (r.chan_state === 'on' ? 'on' : '') + '" title="کانال ' + (r.chan_state === 'on' ? 'روشن، منتظر کف ' + Math.round(r.chan_L) : 'خاموش تا بالای ' + Math.round(s150)) + '">ک</div>'; } }
-    const nres = hasCh ? 2 : 3; for (let j = 0; j < nres; j++) { n.res++; cells += '<div class="gc res" title="ذخیره نقد">ذ</div>'; }
+    const nres = hasCh ? 0 : 1; for (let j = 0; j < nres; j++) { n.res++; cells += '<div class="gc res" title="ذخیره نقد">ذ</div>'; }
     const cap = r.trend_parts > 0 ? fa(r.trend_parts) + ' قسمت در معامله' : (p >= need ? 'حد ورود باز است' : 'حد ورود: بالای ' + nf(need));
     rows += '<div class="gr"><b>' + r.coin + '</b>' + cells + '</div><div class="mut" style="font-size:11px;margin:-2px 0 4px 38px;direction:rtl">' + cap + (hasCh && r.chan_state === 'off' ? ' · کانال همان حد' : '') + '</div>';
   }
@@ -238,7 +238,7 @@ function render5() {
     const st = chRow.chan_state;
     h += '<tr><td>کانال آزمایش (۱ قسمت = ' + fa(Math.round(part)) + ' دلار)</td><td class="n">' + (st === 'off' ? 'خاموش تا بالای ' + nf(s150) : (nf(chRow.chan_L) + ' تا ' + nf(chRow.chan_U) + '، ضرر ' + nf(chRow.chan_L * 0.93))) + '</td></tr>';
   } else h += '<tr><td>کانال آزمایش</td><td class="n">ندارد</td></tr>';
-  h += '<tr><td>ذخیره (نقد)</td><td class="n">' + ((curCoin === 'BTC' || curCoin === 'SUI') ? '۲' : '۳') + ' قسمت = ' + fa(Math.round(part * ((curCoin === 'BTC' || curCoin === 'SUI') ? 2 : 3))) + ' دلار</td></tr>';
+  h += '<tr><td>ذخیره (نقد)</td><td class="n">' + ((curCoin === 'BTC' || curCoin === 'SUI') ? 'ندارد' : '۱ قسمت = ' + fa(Math.round(part)) + ' دلار') + '</td></tr>';
   const bl = fib.filter((f) => f.p < p).sort((a, b) => b.p - a.p)[0], ab = fib.filter((f) => f.p >= p).sort((a, b) => a.p - b.p)[0];
   h += '<tr><td>فیبوناچی (نقشه، نه فرمان)</td><td class="n">' + (bl ? 'پایین ' + nf(bl.p) + ' ' : '') + (ab ? '· بالا ' + nf(ab.p) : '') + '</td></tr></table>';
   el.innerHTML = h;
