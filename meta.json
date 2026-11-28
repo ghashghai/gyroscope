@@ -1,5 +1,5 @@
 {
- "fetched": 1795827458,
+ "fetched": 1795838319,
  "status": {
   "liquidation-history": {
    "BNBUSDT_PERP.A": 1509,
@@ -32,22 +32,22 @@
    "SUIUSDT_PERP.A": 1306
   },
   "ohlcv1h.json": {
-   "BNBUSDT_PERP.A": 1991,
-   "BTCUSDT_PERP.A": 1991,
-   "ETHUSDT_PERP.A": 1991,
-   "SUIUSDT_PERP.A": 1991
+   "BNBUSDT_PERP.A": 1994,
+   "BTCUSDT_PERP.A": 1994,
+   "ETHUSDT_PERP.A": 1994,
+   "SUIUSDT_PERP.A": 1994
   },
   "liq1h.json": {
-   "BNBUSDT_PERP.A": 1615,
-   "BTCUSDT_PERP.A": 1685,
-   "ETHUSDT_PERP.A": 1673,
-   "SUIUSDT_PERP.A": 1835
+   "BNBUSDT_PERP.A": 1617,
+   "BTCUSDT_PERP.A": 1688,
+   "ETHUSDT_PERP.A": 1676,
+   "SUIUSDT_PERP.A": 1838
   },
   "onchain": "11 cols: AdrActCnt,AdrBalCnt,CapMVRVCur,CapMrktCurUSD,FlowInExNtv,FlowInExUSD,FlowOutExNtv,FlowOutExUSD,SplyCur,SplyExpFut10yr,TxCnt",
   "btc_all_cols": "time,AdrActCnt,AdrBalCnt,AssetCompletionTime,AssetEODCompletionTime,BlkCnt,CapMVRVCur,CapMrktCurUSD,CapMrktEstUSD,FeeTotNtv,FlowInExNtv,FlowInExUSD,FlowOutExNtv,FlowOutExUSD,HashRate,IssTotNtv,IssTotUSD,PriceBTC,PriceUSD,ROI1yr,ROI30d,ReferenceRate,ReferenceRateETH,ReferenceRateEUR,ReferenceRateUSD,SplyCur,SplyExNtv,SplyExUSD,SplyExpFut10yr,TxCnt,TxTfrCnt,volume_reported_spot_usd_1d",
   "price": "5789 rows, 2010-07-18 .. 2026-05-23, volcol=volume_reported_spot_usd_1d",
   "usdt_eth": "3099 rows, cols: AdrActCnt,SplyCur,TxCnt | all: time,AdrActCnt,AdrBalCnt,AssetCompletionTime,AssetEODCompletionTime,CapMVRVCur,CapMrktCurUSD,IssTotNtv,IssTotUSD,PriceBTC,PriceUSD,ROI1yr,ROI30d,SplyCur,TxCnt,TxTfrCnt,volume_reported_spot_usd_1d",
   "usdt_trx": "2595 rows, cols: AdrActCnt,SplyCur,TxCnt | all: time,AdrActCnt,AdrBalCnt,AssetCompletionTime,AssetEODCompletionTime,CapMVRVCur,CapMrktCurUSD,IssTotNtv,IssTotUSD,PriceBTC,PriceUSD,ROI1yr,ROI30d,SplyCur,TxCnt,TxTfrCnt",
-  "usdt_supply": "3286 rows, last 2026-11-27 = 173.6B"
+  "usdt_supply": "3287 rows, last 2026-11-28 = 173.7B"
  }
 }
